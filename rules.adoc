@@ -1,0 +1,51 @@
+== Règles du Blackjack en User Stories
+
+=== User Story 1
+
+En tant que joueur, je veux être capable de recevoir deux cartes initiales afin de commencer une partie de blackjack.
+
+Critères d'acceptation :
+- Le joueur reçoit deux cartes dès le début de la partie.
+- Les cartes sont distribuées de manière aléatoire à partir d'un jeu de 52 cartes mélangé.
+
+=== User Story 2
+
+En tant que joueur, je veux pouvoir demander une carte supplémentaire (hit) afin d'améliorer ma main.
+
+Critères d'acceptation :
+- Le joueur peut choisir de demander une carte supplémentaire après avoir reçu ses deux premières cartes.
+- La carte supplémentaire est tirée du paquet de cartes restant.
+
+=== User Story 3
+
+En tant que joueur, je veux pouvoir rester (stand) avec ma main actuelle afin de ne pas prendre de risque supplémentaire.
+
+Critères d'acceptation :
+- Le joueur peut choisir de rester avec sa main actuelle plutôt que de demander une carte supplémentaire.
+- Une fois que le joueur reste, il ne peut plus prendre de décisions pendant ce tour.
+
+=== User Story 4
+
+En tant que joueur, je veux pouvoir doubler ma mise et recevoir une carte supplémentaire (double down) pour augmenter mes gains potentiels.
+
+Critères d'acceptation :
+- Le joueur peut choisir de doubler sa mise après avoir reçu ses deux premières cartes.
+- Après avoir doublé sa mise, le joueur reçoit une seule carte supplémentaire.
+
+=== User Story 5
+
+En tant que joueur, je veux que le croupier tire des cartes supplémentaires jusqu'à ce qu'il atteigne un total de 17 ou plus.
+
+Critères d'acceptation :
+- Le croupier tire des cartes supplémentaires jusqu'à ce que la valeur totale de sa main atteigne 17 ou plus.
+- Le croupier arrête de tirer des cartes dès qu'il atteint un total de 17 ou plus, même s'il a une main gagnante.
+
+=== User Story 6
+
+En tant que joueur, je veux que le jeu détermine automatiquement le résultat de la partie et distribue les gains ou les pertes en fonction des règles du blackjack.
+
+Critères d'acceptation :
+- Le jeu compare automatiquement la main du joueur avec celle du croupier pour déterminer le gagnant.
+- Le joueur gagne si sa main est plus élevée que celle du croupier sans dépasser 21.
+- Le joueur perd si sa main totalise plus de 21 (buste) ou si la main du croupier est plus élevée.
+- Un joueur peut gagner instantanément avec un blackjack (une main de 21 avec deux cartes).
