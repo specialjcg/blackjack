@@ -6,6 +6,8 @@ type PlayingPositionCount = 5 | 6 | 7 | 8 | 9;
 
 type DecksCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+type PlayingPositionId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
 const VALUES = ['as', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k'] as const;
 
 type Card = (typeof VALUES)[number];
@@ -15,6 +17,7 @@ type Deck = [...typeof VALUES, ...typeof VALUES, ...typeof VALUES, ...typeof VAL
 const DECK: Deck = [...VALUES, ...VALUES, ...VALUES, ...VALUES];
 
 type PlayingPosition = {
+  id: PlayingPositionId;
   availableMoney: number;
   bettingBox: number;
   hand: Card[];
@@ -32,9 +35,9 @@ const throwBetError = (bet: Omit<Bet, 'isBet'>): Bet => {
   throw new Error(`Bet with value min: ${bet.min} and max: ${bet.max} is invalid`);
 };
 
-const isValiBet = (bet: Omit<Bet, 'isBet'>): bet is Bet => bet.min >= 0 && bet.max > bet.min;
+const isValidBet = (bet: Omit<Bet, 'isBet'>): bet is Bet => bet.min >= 0 && bet.max > bet.min;
 
-const Bet = (bet: Omit<Bet, 'isBet'>): Bet => (isValiBet(bet) ? bet : throwBetError(bet));
+const Bet = (bet: Omit<Bet, 'isBet'>): Bet => (isValidBet(bet) ? bet : throwBetError(bet));
 
 type BlackJackConfiguration = {
   playingPositionCount: PlayingPositionCount;
@@ -66,21 +69,20 @@ const testShuffler: Shuffler = (cards: Card[]) => {
   return cards;
 };
 
+const matchingId =
+  <T>(idToCheck: T) =>
+  ({ id }: { id: T }) =>
+    id === idToCheck;
+
 const join =
-  (player: Player) =>
+  (player: Player, playingPositionId: PlayingPositionId) =>
   (game: BlackJack): BlackJack => {
-    const availableIndex: number | null = game.playingPositions.findIndex(
-      (playingPosition: PlayingPosition) => !Object.prototype.hasOwnProperty.call(playingPosition, 'availableMoney')
-    );
-
-    if (availableIndex == null) throw new Error('There is no more available playing position');
-
-    const playingPositions = [...game.playingPositions];
-    playingPositions[availableIndex] = { ...player, bettingBox: 0, hand: [] };
+    if (game.playingPositions.find(matchingId(playingPositionId)) != null)
+      throw new Error('This playing position is already taken');
 
     return {
       ...game,
-      playingPositions
+      playingPositions: [...game.playingPositions, { ...player, bettingBox: 0, hand: [], id: playingPositionId }]
     };
   };
 
@@ -106,26 +108,37 @@ const bet =
     playingPositions: game.playingPositions.map(toBettingPosition(position, amount))
   });
 
-// todo: remove mutation
+type DealingInProgress = { cards: Card[]; playingPositions: PlayingPosition[] };
+
+const startDealing = ({ cards }: BlackJack) => ({
+  cards,
+  playingPositions: []
+});
+
+const untilDealingIsDone = (
+  { playingPositions, cards: [card1, card2, ...cards] }: DealingInProgress,
+  playingPosition: PlayingPosition
+) => ({
+  cards,
+  playingPositions: [
+    ...playingPositions,
+    {
+      ...playingPosition,
+      hand: [card1, card2] as Card[]
+    }
+  ]
+});
+
+// todo: finish him
 const deal = (game: BlackJack): BlackJack => {
-  let cards = game.cards;
-
-  for (const playingPosition of game.playingPositions) {
-    if (playingPosition.hand == null) continue;
-
-    const [card1, card2, ...remainingCards] = cards as Card[];
-    cards = remainingCards;
-
-    playingPosition.hand = [card1 as Card, card2 as Card];
-  }
-
+  const { cards, playingPositions } = game.playingPositions.reduce(untilDealingIsDone, startDealing(game));
   const [dealerHand, ...remainingCards] = cards;
 
   return {
     ...game,
     cards: remainingCards,
     dealerHand: [dealerHand] as Card[],
-    playingPositions: game.playingPositions
+    playingPositions
   };
 };
 
@@ -136,7 +149,7 @@ describe('blackJack game', () => {
       decksCount: 2,
       bet: Bet({ min: 5, max: 100 })
     });
-    expect(game.playingPositions.length).toBe(5);
+    expect(game.playingPositions.length).toBe(0);
     expect(game.cards.length).toBe(104);
     expect(game.bet.min).toBe(5);
     expect(game.bet.max).toBe(100);
@@ -165,15 +178,12 @@ describe('blackJack game', () => {
       bet: Bet({ min: 5, max: 100 })
     });
 
-    const gameWithOnePlayer = join({ availableMoney: 500 })(game);
-    const gameWithTwoPlayers = join({ availableMoney: 600 })(gameWithOnePlayer);
+    const gameWithOnePlayer = join({ availableMoney: 500 }, 0)(game);
+    const gameWithTwoPlayers = join({ availableMoney: 600 }, 1)(gameWithOnePlayer);
 
     expect(gameWithTwoPlayers.playingPositions).toStrictEqual([
-      { availableMoney: 500, bettingBox: 0, hand: [] },
-      { availableMoney: 600, bettingBox: 0, hand: [] },
-      {},
-      {},
-      {}
+      { availableMoney: 500, bettingBox: 0, hand: [], id: 0 },
+      { availableMoney: 600, bettingBox: 0, hand: [], id: 1 }
     ]);
   });
 
@@ -184,17 +194,14 @@ describe('blackJack game', () => {
       bet: Bet({ min: 5, max: 100 })
     });
 
-    const gameWithOnePlayer = join({ availableMoney: 500 })(game);
-    const gameWithTwoPlayers = join({ availableMoney: 600 })(gameWithOnePlayer);
+    const gameWithOnePlayer = join({ availableMoney: 500 }, 0)(game);
+    const gameWithTwoPlayers = join({ availableMoney: 600 }, 1)(gameWithOnePlayer);
 
     const gameWith1Bet = bet({ position: 0, amount: 50 })(gameWithTwoPlayers);
 
     expect(gameWith1Bet.playingPositions).toStrictEqual([
-      { availableMoney: 450, bettingBox: 50, hand: [] },
-      { availableMoney: 600, bettingBox: 0, hand: [] },
-      {},
-      {},
-      {}
+      { availableMoney: 450, bettingBox: 50, hand: [], id: 0 },
+      { availableMoney: 600, bettingBox: 0, hand: [], id: 1 }
     ]);
   });
 
@@ -205,8 +212,8 @@ describe('blackJack game', () => {
       bet: Bet({ min: 5, max: 100 })
     });
 
-    const gameWithOnePlayer = join({ availableMoney: 500 })(game);
-    const gameWithTwoPlayers = join({ availableMoney: 600 })(gameWithOnePlayer);
+    const gameWithOnePlayer = join({ availableMoney: 500 }, 0)(game);
+    const gameWithTwoPlayers = join({ availableMoney: 600 }, 1)(gameWithOnePlayer);
 
     const gameWith1Bet = bet({ position: 0, amount: 50 })(gameWithTwoPlayers);
     const gameWith2Bets = bet({ position: 1, amount: 100 })(gameWith1Bet);
@@ -265,11 +272,8 @@ describe('blackJack game', () => {
     ]);
     expect(readyGame.dealerHand).toStrictEqual(['10']);
     expect(readyGame.playingPositions).toStrictEqual([
-      { availableMoney: 450, bettingBox: 50, hand: ['j', 'j'] },
-      { availableMoney: 500, bettingBox: 100, hand: ['6', '5'] },
-      {},
-      {},
-      {}
+      { availableMoney: 450, bettingBox: 50, hand: ['j', 'j'], id: 0 },
+      { availableMoney: 500, bettingBox: 100, hand: ['6', '5'], id: 1 }
     ]);
   });
 
@@ -281,7 +285,7 @@ const BlackJack =
   (blackJackConfiguration: BlackJackConfiguration): BlackJack => {
     return {
       dealerHand: [],
-      playingPositions: new Array(blackJackConfiguration.playingPositionCount).fill({}),
+      playingPositions: [],
       cards: shuffler(new Array(blackJackConfiguration.decksCount).fill(DECK).flat()),
       bet: blackJackConfiguration.bet
     };
