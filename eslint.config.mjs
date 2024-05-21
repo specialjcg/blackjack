@@ -9,9 +9,10 @@ export default [
   eslintConfigPrettier,
   {
     rules: {
-      yoda: 'error',
+      'no-console': 'error',
+      'no-await-in-loop': 'error',
       'prefer-template': 'error',
-      'no-console': 'error'
+      yoda: 'error'
     }
   }
 ];
