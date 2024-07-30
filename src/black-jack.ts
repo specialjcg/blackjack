@@ -19,17 +19,14 @@ type PlayingPosition = {
   availableMoney: number;
   bettingBox: number;
   hand: Card[];
-  isReady: boolean;
+  isDone: boolean;
 };
 
 type Player = {
   availableMoney: number;
 };
 
-type PlayerDecision = {
-  positionId: number;
-  action: 'stand';
-};
+type PlayerAction = 'stand' | 'surrender' | 'double' | 'hit';
 
 type Model<TName extends string, TValues> = TValues & { [modelKey in `is${Capitalize<TName>}`]: true };
 
@@ -52,6 +49,7 @@ type BlackJackConfiguration = {
 };
 
 type BlackJack = {
+  currentPlayerId: PlayingPositionId;
   playingPositions: PlayingPosition[];
   cards: Card[];
   betRange: BetRange;
@@ -65,19 +63,15 @@ const matchingId =
   ({ id }: { id: T }) =>
     id === idToCheck;
 
-// todo: reverse curryfication order
 export const join =
-  (player: Player, playingPositionId: PlayingPositionId) =>
-  (game: BlackJack): BlackJack => {
+  (game: BlackJack) =>
+  (player: Player, playingPositionId: PlayingPositionId): BlackJack => {
     if (game.playingPositions.find(matchingId(playingPositionId)) != null)
       throw new Error('This playing position is already taken');
 
     return {
       ...game,
-      playingPositions: [
-        ...game.playingPositions,
-        { ...player, bettingBox: 0, hand: [], id: playingPositionId, isReady: false }
-      ]
+      playingPositions: [...game.playingPositions, { ...player, bettingBox: 0, hand: [], id: playingPositionId, isDone: false }]
     };
   };
 
@@ -94,8 +88,8 @@ const toBettingPosition =
   });
 
 export const bet =
-  ({ amount, position }: { amount: number; position: number }) =>
-  (game: BlackJack): BlackJack => {
+  (game: BlackJack) =>
+  ({ amount, position }: { amount: number; position: number }): BlackJack => {
     if (amount < game.betRange.min) throw Error(`Player should bet more than ${game.betRange.min}, ${amount} received`);
     if (amount > game.betRange.max) throw Error(`Player should bet less than ${game.betRange.max}, ${amount} received`);
     return {
@@ -135,29 +129,86 @@ export const deal = (game: BlackJack): BlackJack => {
   };
 };
 
+const nextPlayerId = (game: BlackJack) => {
+  const playerId = (game.currentPlayerId + 1) % game.playingPositions.length;
+
+  // todo: refacto
+  if (game.playingPositions[playerId]?.isDone) {
+    if (game.playingPositions[playerId + 1]?.isDone) {
+      return ((playerId + 2) % game.playingPositions.length) as PlayingPositionId;
+    }
+
+    return ((playerId + 1) % game.playingPositions.length) as PlayingPositionId;
+  }
+
+  return (playerId % game.playingPositions.length) as PlayingPositionId;
+};
+
 export const playerDecision =
   (game: BlackJack) =>
-  (decision: PlayerDecision): BlackJack => ({
-    ...game,
-    playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
-      if (decision.positionId === playingPosition.id) {
-        return {
-          ...playingPosition,
-          isReady: true
-        };
-      }
+  (action: PlayerAction): BlackJack => {
+    // const { cards: initialCards, playingPositions } = game.playingPositions.reduce(() => {}, startDealing(game));
+    let cardsAfterPlayerDecision: Card[] = game.cards;
 
-      return playingPosition;
-    })
-  });
+    const gameUpdate: BlackJack = {
+      ...game,
+      playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
+        if (game.currentPlayerId === playingPosition.id && action === 'stand') {
+          return {
+            ...playingPosition,
+            isDone: true
+          };
+        }
+
+        if (game.currentPlayerId === playingPosition.id && action === 'surrender') {
+          return {
+            ...playingPosition,
+            isDone: true,
+            availableMoney: playingPosition.availableMoney + playingPosition.bettingBox / 2,
+            bettingBox: 0
+          };
+        }
+
+        if (game.currentPlayerId === playingPosition.id && action === 'double') {
+          const [nextCard, ...cards] = cardsAfterPlayerDecision;
+          cardsAfterPlayerDecision = cards;
+
+          return {
+            ...playingPosition,
+            isDone: true,
+            availableMoney: playingPosition.availableMoney - playingPosition.bettingBox,
+            bettingBox: playingPosition.bettingBox * 2,
+            hand: [...playingPosition.hand, nextCard as Card]
+          };
+        }
+
+        if (game.currentPlayerId === playingPosition.id && action === 'hit') {
+          const [nextCard, ...cards] = cardsAfterPlayerDecision;
+          cardsAfterPlayerDecision = cards;
+
+          return {
+            ...playingPosition,
+            hand: [...playingPosition.hand, nextCard as Card]
+          };
+        }
+
+        return playingPosition;
+      })
+    };
+
+    return {
+      ...gameUpdate,
+      currentPlayerId: nextPlayerId(game),
+      cards: cardsAfterPlayerDecision
+    };
+  };
 
 export const BlackJack =
   (shuffler: Shuffler) =>
-  (blackJackConfiguration: BlackJackConfiguration): BlackJack => {
-    return {
-      dealerHand: [],
-      playingPositions: [],
-      cards: shuffler(new Array(blackJackConfiguration.decksCount).fill(DECK).flat()),
-      betRange: blackJackConfiguration.bet
-    };
-  };
+  (blackJackConfiguration: BlackJackConfiguration): BlackJack => ({
+    dealerHand: [],
+    playingPositions: [],
+    cards: shuffler(new Array(blackJackConfiguration.decksCount).fill(DECK).flat()),
+    betRange: blackJackConfiguration.bet,
+    currentPlayerId: 0
+  });
