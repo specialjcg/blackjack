@@ -129,20 +129,20 @@ export const deal = (game: BlackJack): BlackJack => {
   };
 };
 
-const nextPlayerId = (game: BlackJack) => {
-  const playerId = (game.currentPlayerId + 1) % game.playingPositions.length;
+const toNextPlayerId =
+  (game: BlackJack) =>
+  (_: number, playerIndex: number = 0): PlayingPositionId =>
+    ((game.currentPlayerId + playerIndex + 1) % game.playingPositions.length) as PlayingPositionId;
 
-  // todo: refacto
-  if (game.playingPositions[playerId]?.isDone) {
-    if (game.playingPositions[playerId + 1]?.isDone) {
-      return ((playerId + 2) % game.playingPositions.length) as PlayingPositionId;
-    }
+const nextPlayerIds = ({ playingPositions: { length } }: BlackJack): PlayingPositionId[] => Array.from({ length });
 
-    return ((playerId + 1) % game.playingPositions.length) as PlayingPositionId;
-  }
+const toNextReadyPlayer =
+  (game: BlackJack) =>
+  (nextPlayerId: PlayingPositionId, currentPlayerId: PlayingPositionId): PlayingPositionId =>
+    game.playingPositions[nextPlayerId]?.isDone ? currentPlayerId : nextPlayerId;
 
-  return (playerId % game.playingPositions.length) as PlayingPositionId;
-};
+const nextPlayerId = (game: BlackJack) =>
+  nextPlayerIds(game).map(toNextPlayerId(game)).reduce(toNextReadyPlayer(game), toNextPlayerId(game)(0));
 
 export const playerDecision =
   (game: BlackJack) =>

@@ -32,7 +32,7 @@ const readyGameWithTwoPlayers = () => {
   return deal(gameWith2Bets);
 };
 
-const readyGameWithThreePlayers = () => {
+const readyGameWithFourPlayers = () => {
   const game = BlackJack(testShuffler)({
     playingPositionCount: 5,
     decksCount: 1,
@@ -42,12 +42,14 @@ const readyGameWithThreePlayers = () => {
   const gameWithOnePlayer = join(game)({ availableMoney: 500 }, 0);
   const gameWithTwoPlayers = join(gameWithOnePlayer)({ availableMoney: 600 }, 1);
   const gameWithThreePlayers = join(gameWithTwoPlayers)({ availableMoney: 600 }, 2);
+  const gameWithFourPlayers = join(gameWithThreePlayers)({ availableMoney: 600 }, 3);
 
-  const gameWith1Bet = bet(gameWithThreePlayers)({ position: 0, amount: 50 });
+  const gameWith1Bet = bet(gameWithFourPlayers)({ position: 0, amount: 50 });
   const gameWith2Bets = bet(gameWith1Bet)({ position: 1, amount: 100 });
   const gameWith3Bets = bet(gameWith2Bets)({ position: 2, amount: 100 });
+  const gameWith4Bets = bet(gameWith3Bets)({ position: 3, amount: 50 });
 
-  return deal(gameWith3Bets);
+  return deal(gameWith4Bets);
 };
 
 describe('blackJack game', () => {
@@ -227,17 +229,17 @@ describe('blackJack game', () => {
   });
 
   it('should ignore player surrander player with three players', () => {
-    const readyGame = readyGameWithThreePlayers();
+    const readyGame = readyGameWithFourPlayers();
     const playerOneSurrender = playerDecision(readyGame)('surrender');
     const playerTwoSurrender = playerDecision(playerOneSurrender)('surrender');
-    const playerThreePlayed = playerDecision(playerTwoSurrender)('hit');
+    const playerThreeSurrender = playerDecision(playerTwoSurrender)('surrender');
+    const playerFourPlayed = playerDecision(playerThreeSurrender)('hit');
 
-    expect(playerThreePlayed.currentPlayerId).toStrictEqual(2);
+    expect(playerFourPlayed.currentPlayerId).toStrictEqual(3);
   });
 
   // todo: Players turn
-  //  - vérifier qu'un joueur qui est "done" n'est pas pris en compte dans le calcul du "currentPlayerId"
-  //  - loose
+  //  - lose
   //  - split (a player have two hands for his playing position)
 
   // todo: Dealer second card
