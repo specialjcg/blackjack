@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bet, BetRange, BlackJack, Card, deal, join, playerDecision, Shuffler } from './black-jack';
+import { bet, BetRange, BlackJack, Card, deal, join, Shuffler } from './black-jack';
+import { playerDoubleDecision, playerHitDecision, playerStandDecision, playerSurrenderDecision } from './decisions';
 
 let seed = 1;
 
@@ -189,7 +190,7 @@ describe('blackJack game', () => {
   it('should stand for first player', () => {
     const readyGame = readyGameWithTwoPlayers();
 
-    const played = playerDecision(readyGame)('stand');
+    const played = playerStandDecision(readyGame)();
 
     expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(true);
   });
@@ -197,7 +198,7 @@ describe('blackJack game', () => {
   it('should surrender for first player', () => {
     const readyGame = readyGameWithTwoPlayers();
 
-    const played = playerDecision(readyGame)('surrender');
+    const played = playerSurrenderDecision(readyGame)();
 
     expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(true);
     expect(played.playingPositions.at(0)?.hands[0].bettingBox).toBe(0);
@@ -207,7 +208,7 @@ describe('blackJack game', () => {
   it('should double for first player', () => {
     const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
 
-    const fisrtPlayerPlayed = playerDecision(readyGame)('double');
+    const fisrtPlayerPlayed = playerDoubleDecision(readyGame)();
 
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].isDone).toBe(true);
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].bettingBox).toBe(100);
@@ -215,7 +216,7 @@ describe('blackJack game', () => {
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['2', '3', '5']);
     expect(fisrtPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['5', '6', '4']);
 
-    const secondPlayerPlayed = playerDecision(fisrtPlayerPlayed)('double');
+    const secondPlayerPlayed = playerDoubleDecision(fisrtPlayerPlayed)();
     expect(secondPlayerPlayed.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['4', '5', '5']);
     expect(secondPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['6', '4', '10']);
   });
@@ -223,7 +224,7 @@ describe('blackJack game', () => {
   it('should hit for first player', () => {
     const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
 
-    const played = playerDecision(readyGame)('hit');
+    const played = playerHitDecision(readyGame)();
 
     expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(false);
     expect(played.playingPositions.at(0)?.hands[0].bettingBox).toBe(50);
@@ -235,33 +236,33 @@ describe('blackJack game', () => {
   it('should not hit a second time while every player has not played', () => {
     const readyGame = readyGameWithTwoPlayers();
 
-    const playerOnePlayed = playerDecision(readyGame)('hit');
-    const playerTwoPlayed = playerDecision(playerOnePlayed)('hit');
+    const playerOnePlayed = playerHitDecision(readyGame)();
+    const playerTwoPlayed = playerHitDecision(playerOnePlayed)();
 
     expect(playerTwoPlayed.currentPlayerId).toStrictEqual(0);
   });
 
   it('should ignore player surrander player with two players', () => {
     const readyGame = readyGameWithTwoPlayers();
-    const playerOneSurrender = playerDecision(readyGame)('surrender');
-    const playerTwoPlayed = playerDecision(playerOneSurrender)('hit');
+    const playerOneSurrender = playerSurrenderDecision(readyGame)();
+    const playerTwoPlayed = playerHitDecision(playerOneSurrender)();
 
     expect(playerTwoPlayed.currentPlayerId).toStrictEqual(1);
   });
 
   it('should ignore player surrander player with three players', () => {
     const readyGame = readyGameWithFourPlayers();
-    const playerOneSurrender = playerDecision(readyGame)('surrender');
-    const playerTwoSurrender = playerDecision(playerOneSurrender)('surrender');
-    const playerThreeSurrender = playerDecision(playerTwoSurrender)('surrender');
-    const playerFourPlayed = playerDecision(playerThreeSurrender)('hit');
+    const playerOneSurrender = playerSurrenderDecision(readyGame)();
+    const playerTwoSurrender = playerSurrenderDecision(playerOneSurrender)();
+    const playerThreeSurrender = playerSurrenderDecision(playerTwoSurrender)();
+    const playerFourPlayed = playerHitDecision(playerThreeSurrender)();
 
     expect(playerFourPlayed.currentPlayerId).toStrictEqual(3);
   });
 
   it('should lose after some hits for first player', () => {
     const readyGame = readyGameWithTwoPlayers(HIGH_SHUFFLER);
-    const playerOneHit = playerDecision(readyGame)('hit');
+    const playerOneHit = playerHitDecision(readyGame)();
 
     expect(playerOneHit.playingPositions.at(0)?.hands[0].isDone).toBe(true);
     expect(playerOneHit.playingPositions.at(0)?.hands[0].bettingBox).toStrictEqual(0);
@@ -269,7 +270,7 @@ describe('blackJack game', () => {
 
   it('should should split for first player', () => {
     const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
-    const played = playerDecision(readyGame)('split');
+    const played = playerSplitDecision(readyGame)(10); // todo: implement it
 
     expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(false);
     expect(played.playingPositions.at(0)?.hands[1]?.isDone).toBe(false);
