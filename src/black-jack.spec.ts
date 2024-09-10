@@ -3,12 +3,33 @@ import { bet, BetRange, BlackJack, Card, deal, join, playerDecision, Shuffler } 
 
 let seed = 1;
 
+const LOW_SHUFFLER: Shuffler = () => [
+  ...(['2', '3', '4', '5', '6', '5', '5', '6', '4', '10', '7', '10', '7'] as Card[]),
+  ...(['k', '4', '7', '7', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'] as Card[]),
+  ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
+  ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
+];
+
+const HIGH_SHUFFLER: Shuffler = () => [
+  ...(['j', 'k', 'q', '4', '3', '5', '5', '6', '4', '10', '7', '10', '7'] as Card[]),
+  ...(['k', '4', '7', '7', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'] as Card[]),
+  ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
+  ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
+];
+
+const SPLIT_SHUFFLER: Shuffler = () => [
+  ...(['3', '3', 'q', '4', '3', '5', '5', '6', '4', '10', '7', '10', '7'] as Card[]),
+  ...(['k', '4', '7', '7', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'] as Card[]),
+  ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
+  ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
+];
+
 const random = () => {
   const x = Math.sin(seed++) * 10000;
   return x - Math.floor(x);
 };
 
-const testShuffler: Shuffler = (cards: Card[]) => {
+const randomShuffler: Shuffler = (cards: Card[]) => {
   for (let i = cards.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [cards[i], cards[j]] = [cards[j], cards[i]] as [Card, Card];
@@ -16,8 +37,8 @@ const testShuffler: Shuffler = (cards: Card[]) => {
   return cards;
 };
 
-const readyGameWithTwoPlayers = () => {
-  const game = BlackJack(testShuffler)({
+const readyGameWithTwoPlayers = (shuffler?: Shuffler) => {
+  const game = BlackJack(shuffler ? shuffler : randomShuffler)({
     playingPositionCount: 5,
     decksCount: 1,
     bet: BetRange({ min: 5, max: 100 })
@@ -33,7 +54,7 @@ const readyGameWithTwoPlayers = () => {
 };
 
 const readyGameWithFourPlayers = () => {
-  const game = BlackJack(testShuffler)({
+  const game = BlackJack(randomShuffler)({
     playingPositionCount: 5,
     decksCount: 1,
     bet: BetRange({ min: 5, max: 100 })
@@ -54,7 +75,7 @@ const readyGameWithFourPlayers = () => {
 
 describe('blackJack game', () => {
   it('should create a game between 5 and 9 playingPosition and between 1 and 8 decks 52 cards', () => {
-    const game = BlackJack(testShuffler)({
+    const game = BlackJack(randomShuffler)({
       playingPositionCount: 5,
       decksCount: 2,
       bet: BetRange({ min: 5, max: 100 })
@@ -66,23 +87,23 @@ describe('blackJack game', () => {
   });
 
   it('should create a game with 1 shuffeled deck', () => {
-    const game = BlackJack(testShuffler)({
+    const game = BlackJack(randomShuffler)({
       playingPositionCount: 5,
       decksCount: 1,
       bet: BetRange({ min: 5, max: 100 })
     });
     const expectedDesk: Card[] = [
       ...(['j', 'k', 'q', '5', '3', '5', '5', '6', '4', '10', '7', '10', '7'] as Card[]),
-      ...(['k', '4', '7', '7', 'j', '4', 'as', '10', '9', '3', '8', 'k', 'as'] as Card[]),
-      ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'as'] as Card[]),
-      ...(['q', '2', 'q', '8', '2', '9', 'as', '8', '9', 'k', '3', '8', '2'] as Card[])
+      ...(['k', '4', '7', '7', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'] as Card[]),
+      ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
+      ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
     ];
 
     expect(game.cards).toStrictEqual(expectedDesk);
   });
 
   it('should join two players', () => {
-    const game = BlackJack(testShuffler)({
+    const game = BlackJack(randomShuffler)({
       playingPositionCount: 5,
       decksCount: 1,
       bet: BetRange({ min: 5, max: 100 })
@@ -92,13 +113,13 @@ describe('blackJack game', () => {
     const gameWithTwoPlayers = join(gameWithOnePlayer)({ availableMoney: 600 }, 1);
 
     expect(gameWithTwoPlayers.playingPositions).toStrictEqual([
-      { availableMoney: 500, bettingBox: 0, hand: [], id: 0, isDone: false },
-      { availableMoney: 600, bettingBox: 0, hand: [], id: 1, isDone: false }
+      { availableMoney: 500, id: 0, hands: [{ bettingBox: 0, cards: [], isDone: false }] },
+      { availableMoney: 600, id: 1, hands: [{ bettingBox: 0, cards: [], isDone: false }] }
     ]);
   });
 
   it('should have 1 betting player', () => {
-    const game = BlackJack(testShuffler)({
+    const game = BlackJack(randomShuffler)({
       playingPositionCount: 5,
       decksCount: 1,
       bet: BetRange({ min: 5, max: 100 })
@@ -110,8 +131,8 @@ describe('blackJack game', () => {
     const gameWith1Bet = bet(gameWithTwoPlayers)({ position: 0, amount: 50 });
 
     expect(gameWith1Bet.playingPositions).toStrictEqual([
-      { availableMoney: 450, bettingBox: 50, hand: [], id: 0, isDone: false },
-      { availableMoney: 600, bettingBox: 0, hand: [], id: 1, isDone: false }
+      { availableMoney: 450, id: 0, hands: [{ bettingBox: 50, cards: [], isDone: false }] },
+      { availableMoney: 600, id: 1, hands: [{ bettingBox: 0, cards: [], isDone: false }] }
     ]);
   });
 
@@ -123,20 +144,20 @@ describe('blackJack game', () => {
       betRange: BetRange({ min: 5, max: 100 }),
       cards: [
         ...['9', 'q', '9', 'j', '2', '4', 'q', '6', '4', 'k', 'k', '7', '3'],
-        ...['9', '4', '8', 'k', '10', '5', '3', '3', '2', 'as', '2', '7', '7'],
-        ...['2', '8', 'q', '6', 'as', 'k', '5', 'as', '9', 'as', '3', 'j', '5'],
+        ...['9', '4', '8', 'k', '10', '5', '3', '3', '2', 'ace', '2', '7', '7'],
+        ...['2', '8', 'q', '6', 'ace', 'k', '5', 'ace', '9', 'ace', '3', 'j', '5'],
         ...['8', 'q', '4', '10', '7', '8', '6', '10']
       ],
       playingPositions: [
-        { availableMoney: 450, bettingBox: 50, hand: ['j', 'j'], id: 0, isDone: false },
-        { availableMoney: 500, bettingBox: 100, hand: ['6', '5'], id: 1, isDone: false }
+        { id: 0, availableMoney: 450, hands: [{ bettingBox: 50, cards: ['j', 'j'], isDone: false }] },
+        { id: 1, availableMoney: 500, hands: [{ bettingBox: 100, cards: ['6', '5'], isDone: false }] }
       ],
       currentPlayerId: 0
     });
   });
 
   it('should not bet amount less than minimal game bet amount', () => {
-    const game = BlackJack(testShuffler)({
+    const game = BlackJack(randomShuffler)({
       playingPositionCount: 5,
       decksCount: 1,
       bet: BetRange({ min: 5, max: 100 })
@@ -151,7 +172,7 @@ describe('blackJack game', () => {
   });
 
   it('should not bet amount more than maximal game bet amount', () => {
-    const game = BlackJack(testShuffler)({
+    const game = BlackJack(randomShuffler)({
       playingPositionCount: 5,
       decksCount: 1,
       bet: BetRange({ min: 5, max: 100 })
@@ -170,7 +191,7 @@ describe('blackJack game', () => {
 
     const played = playerDecision(readyGame)('stand');
 
-    expect(played.playingPositions.at(0)?.isDone).toBe(true);
+    expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(true);
   });
 
   it('should surrender for first player', () => {
@@ -178,36 +199,36 @@ describe('blackJack game', () => {
 
     const played = playerDecision(readyGame)('surrender');
 
-    expect(played.playingPositions.at(0)?.isDone).toBe(true);
-    expect(played.playingPositions.at(0)?.bettingBox).toBe(0);
+    expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(true);
+    expect(played.playingPositions.at(0)?.hands[0].bettingBox).toBe(0);
     expect(played.playingPositions.at(0)?.availableMoney).toBe(475);
   });
 
   it('should double for first player', () => {
-    const readyGame = readyGameWithTwoPlayers();
+    const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
 
     const fisrtPlayerPlayed = playerDecision(readyGame)('double');
 
-    expect(fisrtPlayerPlayed.playingPositions.at(0)?.isDone).toBe(true);
-    expect(fisrtPlayerPlayed.playingPositions.at(0)?.bettingBox).toBe(100);
+    expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].isDone).toBe(true);
+    expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].bettingBox).toBe(100);
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.availableMoney).toBe(400);
-    expect(fisrtPlayerPlayed.playingPositions.at(0)?.hand).toStrictEqual(['4', 'as', '9']);
-    expect(fisrtPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['k', '5', '6']);
+    expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['2', '3', '5']);
+    expect(fisrtPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['5', '6', '4']);
 
     const secondPlayerPlayed = playerDecision(fisrtPlayerPlayed)('double');
-    expect(secondPlayerPlayed.playingPositions.at(1)?.hand).toStrictEqual(['10', '7', 'k']);
-    expect(secondPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['5', '6', '4']);
+    expect(secondPlayerPlayed.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['4', '5', '5']);
+    expect(secondPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['6', '4', '10']);
   });
 
   it('should hit for first player', () => {
-    const readyGame = readyGameWithTwoPlayers();
+    const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
 
     const played = playerDecision(readyGame)('hit');
 
-    expect(played.playingPositions.at(0)?.isDone).toBe(false);
-    expect(played.playingPositions.at(0)?.bettingBox).toBe(50);
+    expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(false);
+    expect(played.playingPositions.at(0)?.hands[0].bettingBox).toBe(50);
     expect(played.playingPositions.at(0)?.availableMoney).toBe(450);
-    expect(played.playingPositions.at(0)?.hand).toStrictEqual(['7', 'k', '2']);
+    expect(played.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['2', '3', '5']);
     expect(played.currentPlayerId).toStrictEqual(1);
   });
 
@@ -238,9 +259,30 @@ describe('blackJack game', () => {
     expect(playerFourPlayed.currentPlayerId).toStrictEqual(3);
   });
 
+  it('should lose after some hits for first player', () => {
+    const readyGame = readyGameWithTwoPlayers(HIGH_SHUFFLER);
+    const playerOneHit = playerDecision(readyGame)('hit');
+
+    expect(playerOneHit.playingPositions.at(0)?.hands[0].isDone).toBe(true);
+    expect(playerOneHit.playingPositions.at(0)?.hands[0].bettingBox).toStrictEqual(0);
+  });
+
+  it('should should split for first player', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const played = playerDecision(readyGame)('split');
+
+    expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(false);
+    expect(played.playingPositions.at(0)?.hands[1]?.isDone).toBe(false);
+    expect(played.playingPositions.at(0)?.hands[0].bettingBox).toBe(50);
+    expect(played.playingPositions.at(0)?.hands[1]?.bettingBox).toBe(10);
+    expect(played.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['3', '5']);
+    expect(played.playingPositions.at(0)?.hands[1]?.cards).toStrictEqual(['3', '5']);
+    expect(played.playingPositions.at(0)?.availableMoney).toBe(450);
+  });
+
   // todo: Players turn
-  //  - lose
   //  - split (a player have two hands for his playing position)
+  //  - rules with as 1 or 11
 
   // todo: Dealer second card
 });

@@ -6,7 +6,7 @@ type DecksCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 type PlayingPositionId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-const VALUES = ['as', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k'] as const;
+const VALUES = ['ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k'] as const;
 
 export type Card = (typeof VALUES)[number];
 
@@ -14,19 +14,23 @@ type Deck = [...typeof VALUES, ...typeof VALUES, ...typeof VALUES, ...typeof VAL
 
 const DECK: Deck = [...VALUES, ...VALUES, ...VALUES, ...VALUES];
 
+type Hand = {
+  bettingBox: number;
+  cards: Card[];
+  isDone: boolean;
+};
+
 type PlayingPosition = {
   id: PlayingPositionId;
   availableMoney: number;
-  bettingBox: number;
-  hand: Card[];
-  isDone: boolean;
+  hands: [Hand] & Hand[];
 };
 
 type Player = {
   availableMoney: number;
 };
 
-type PlayerAction = 'stand' | 'surrender' | 'double' | 'hit';
+type PlayerAction = 'stand' | 'surrender' | 'double' | 'hit' | 'split';
 
 type Model<TName extends string, TValues> = TValues & { [modelKey in `is${Capitalize<TName>}`]: true };
 
@@ -60,7 +64,7 @@ export type Shuffler = (cards: Card[]) => Card[];
 
 const matchingId =
   <T>(idToCheck: T) =>
-  ({ id }: { id: T }) =>
+  ({ id }: { id: T }): boolean =>
     id === idToCheck;
 
 export const join =
@@ -71,13 +75,21 @@ export const join =
 
     return {
       ...game,
-      playingPositions: [...game.playingPositions, { ...player, bettingBox: 0, hand: [], id: playingPositionId, isDone: false }]
+      playingPositions: [
+        ...game.playingPositions,
+        {
+          ...player,
+          id: playingPositionId,
+          hands: [{ bettingBox: 0, cards: [], isDone: false }]
+        }
+      ]
     };
   };
 
-const applyBet = (playingPosition: PlayingPosition, amount: number) => ({
+const applyBet = (playingPosition: PlayingPosition, amount: number): PlayingPosition => ({
+  id: playingPosition.id,
   availableMoney: playingPosition.availableMoney - amount,
-  bettingBox: amount
+  hands: [{ ...playingPosition.hands[0], bettingBox: amount }]
 });
 
 const toBettingPosition =
@@ -108,13 +120,18 @@ const startDealing = ({ cards }: BlackJack) => ({
 const untilDealingIsDone = (
   { playingPositions, cards: [card1, card2, ...cards] }: DealingInProgress,
   playingPosition: PlayingPosition
-) => ({
+): { cards: Card[]; playingPositions: PlayingPosition[] } => ({
   cards,
   playingPositions: [
     ...playingPositions,
     {
       ...playingPosition,
-      hand: [card1, card2] as Card[]
+      hands: [
+        {
+          ...playingPosition.hands[0],
+          cards: [card1, card2] as Card[]
+        }
+      ]
     }
   ]
 });
@@ -139,57 +156,104 @@ const nextPlayerIds = ({ playingPositions: { length } }: BlackJack): PlayingPosi
 const toNextReadyPlayer =
   (game: BlackJack) =>
   (nextPlayerId: PlayingPositionId, currentPlayerId: PlayingPositionId): PlayingPositionId =>
-    game.playingPositions[nextPlayerId]?.isDone ? currentPlayerId : nextPlayerId;
+    game.playingPositions[nextPlayerId]?.hands[0].isDone ? currentPlayerId : nextPlayerId;
 
 const nextPlayerId = (game: BlackJack) =>
   nextPlayerIds(game).map(toNextPlayerId(game)).reduce(toNextReadyPlayer(game), toNextPlayerId(game)(0));
 
+const PICTURES = ['10', 'j', 'q', 'k'];
+
+const PICTURE_VALUE = 10;
+
+const cardValue = (card: Card) => (PICTURES.includes(card) ? PICTURE_VALUE : +card);
+
+const toHandValue = (handValue: number, card: Card) => handValue + cardValue(card);
+
+const exceeding21 = (hand: Card[]) => hand.reduce(toHandValue, 0) > 21;
+
+const losePlayingPosition = (playingPosition: PlayingPosition): PlayingPosition => ({
+  ...playingPosition,
+  hands: [
+    {
+      ...playingPosition.hands[0],
+      isDone: true,
+      bettingBox: 0
+    }
+  ]
+});
+
+const doublePlayingPosition = (playingPosition: PlayingPosition, cards: Card[]): PlayingPosition => ({
+  ...playingPosition,
+  availableMoney: playingPosition.availableMoney - playingPosition.hands[0].bettingBox,
+  hands: [
+    {
+      ...playingPosition.hands[0],
+      isDone: true,
+      bettingBox: playingPosition.hands[0].bettingBox * 2,
+      cards
+    }
+  ]
+});
+
+const hitPlayingPosition = (playingPosition: PlayingPosition, cards: Card[]): PlayingPosition => ({
+  ...playingPosition,
+  hands: [{ ...playingPosition.hands[0], cards }]
+});
+
+const surrenderPlayingPosition = (playingPosition: PlayingPosition): PlayingPosition => ({
+  ...playingPosition,
+  availableMoney: playingPosition.availableMoney + playingPosition.hands[0].bettingBox / 2,
+  hands: [
+    {
+      ...playingPosition.hands[0],
+      isDone: true,
+      bettingBox: 0
+    }
+  ]
+});
+
+const standPlayingPosition = (playingPosition: PlayingPosition): PlayingPosition => ({
+  ...playingPosition,
+  hands: [
+    {
+      ...playingPosition.hands[0],
+      isDone: true
+    }
+  ]
+});
+
 export const playerDecision =
   (game: BlackJack) =>
   (action: PlayerAction): BlackJack => {
-    // const { cards: initialCards, playingPositions } = game.playingPositions.reduce(() => {}, startDealing(game));
     let cardsAfterPlayerDecision: Card[] = game.cards;
 
     const gameUpdate: BlackJack = {
       ...game,
       playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
         if (game.currentPlayerId === playingPosition.id && action === 'stand') {
-          return {
-            ...playingPosition,
-            isDone: true
-          };
+          return standPlayingPosition(playingPosition);
         }
 
         if (game.currentPlayerId === playingPosition.id && action === 'surrender') {
-          return {
-            ...playingPosition,
-            isDone: true,
-            availableMoney: playingPosition.availableMoney + playingPosition.bettingBox / 2,
-            bettingBox: 0
-          };
+          return surrenderPlayingPosition(playingPosition);
         }
 
         if (game.currentPlayerId === playingPosition.id && action === 'double') {
           const [nextCard, ...cards] = cardsAfterPlayerDecision;
           cardsAfterPlayerDecision = cards;
 
-          return {
-            ...playingPosition,
-            isDone: true,
-            availableMoney: playingPosition.availableMoney - playingPosition.bettingBox,
-            bettingBox: playingPosition.bettingBox * 2,
-            hand: [...playingPosition.hand, nextCard as Card]
-          };
+          const handCards = [...playingPosition.hands[0].cards, nextCard as Card];
+          return exceeding21(handCards)
+            ? losePlayingPosition(playingPosition)
+            : doublePlayingPosition(playingPosition, handCards);
         }
 
         if (game.currentPlayerId === playingPosition.id && action === 'hit') {
           const [nextCard, ...cards] = cardsAfterPlayerDecision;
           cardsAfterPlayerDecision = cards;
 
-          return {
-            ...playingPosition,
-            hand: [...playingPosition.hand, nextCard as Card]
-          };
+          const handCards = [...playingPosition.hands[0].cards, nextCard as Card];
+          return exceeding21(handCards) ? losePlayingPosition(playingPosition) : hitPlayingPosition(playingPosition, handCards);
         }
 
         return playingPosition;
