@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { bet, BetRange, BlackJack, Card, deal, join, Shuffler } from './black-jack';
-import { playerDoubleDecision, playerHitDecision, playerStandDecision, playerSurrenderDecision } from './decisions';
+import {
+  OnlySplitEqualCardsError,
+  OnlySplitFirstTurnError,
+  playerDoubleDecision,
+  playerHitDecision,
+  playerSplitDecision,
+  playerStandDecision,
+  playerSurrenderDecision
+} from './decisions';
 
 let seed = 1;
 
@@ -270,7 +278,7 @@ describe('blackJack game', () => {
 
   it('should should split for first player', () => {
     const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
-    const played = playerSplitDecision(readyGame)(10); // todo: implement it
+    const played = playerSplitDecision(readyGame)(10);
 
     expect(played.playingPositions.at(0)?.hands[0].isDone).toBe(false);
     expect(played.playingPositions.at(0)?.hands[1]?.isDone).toBe(false);
@@ -278,12 +286,32 @@ describe('blackJack game', () => {
     expect(played.playingPositions.at(0)?.hands[1]?.bettingBox).toBe(10);
     expect(played.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['3', '5']);
     expect(played.playingPositions.at(0)?.hands[1]?.cards).toStrictEqual(['3', '5']);
-    expect(played.playingPositions.at(0)?.availableMoney).toBe(450);
+    expect(played.playingPositions.at(0)?.availableMoney).toBe(440);
   });
 
-  // todo: Players turn
-  //  - split (a player have two hands for his playing position)
-  //  - rules with as 1 or 11
+  it('should only allow split when cards are equals', () => {
+    const readyGame = readyGameWithTwoPlayers(HIGH_SHUFFLER);
 
-  // todo: Dealer second card
+    expect(() => {
+      playerSplitDecision(readyGame)(10);
+    }).toThrowError(new OnlySplitEqualCardsError('j', 'k'));
+  });
+
+  it('should only allow split on first player turn', () => {
+    const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
+
+    const playerOnePlayed = playerHitDecision(readyGame)();
+    const playerTwoPlayed = playerSurrenderDecision(playerOnePlayed)();
+
+    expect(() => {
+      playerSplitDecision(playerTwoPlayed)(10);
+    }).toThrowError(new OnlySplitFirstTurnError());
+  });
+
+  // todo:
+  //  - manage player with two hands
+  //  - cannot double after split
+  //  - rules with as 1 or 11
+  //  - Dealer second card
+  //  - what if all players are done
 });
