@@ -1,4 +1,4 @@
-import { BlackJack, PlayingPosition } from '../black-jack';
+import { BlackJack, PlayingPosition, PlayingPositionId } from '../black-jack';
 import { nextPlayerId } from './decision-commons';
 
 const standPlayingPosition = (playingPosition: PlayingPosition): PlayingPosition => ({
@@ -6,21 +6,18 @@ const standPlayingPosition = (playingPosition: PlayingPosition): PlayingPosition
   hands: [{ ...playingPosition.hands[0], isDone: true }]
 });
 
-export const playerStandDecision = (game: BlackJack) => (): BlackJack => {
-  const gameUpdate: BlackJack = {
-    ...game,
-    playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
-      if (game.currentPlayerId === playingPosition.id) {
-        return standPlayingPosition(playingPosition);
-      }
+const toStandForPlayer =
+  (playingPositionId: PlayingPositionId) =>
+  (playingPosition: PlayingPosition): PlayingPosition =>
+    playingPositionId === playingPosition.id ? standPlayingPosition(playingPosition) : playingPosition;
 
-      return playingPosition;
-    })
-  };
+const updatePlayingPosition = (game: BlackJack): BlackJack => ({
+  ...game,
+  playingPositions: game.playingPositions.map(toStandForPlayer(game.currentPlayerId))
+});
 
-  return {
-    ...gameUpdate,
-    currentPlayerId: nextPlayerId(game),
-    cards: game.cards
-  };
-};
+export const playerStandDecision = (game: BlackJack) => (): BlackJack => ({
+  ...updatePlayingPosition(game),
+  currentPlayerId: nextPlayerId(game),
+  cards: game.cards
+});

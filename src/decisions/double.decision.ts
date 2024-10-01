@@ -20,17 +20,13 @@ export const playerDoubleDecision = (game: BlackJack) => (): BlackJack => {
   const gameUpdate: BlackJack = {
     ...game,
     playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
-      if (game.currentPlayerId === playingPosition.id) {
-        const [nextCard, ...cards] = cardsAfterPlayerDecision;
-        cardsAfterPlayerDecision = cards;
+      if (game.currentPlayerId !== playingPosition.id) return playingPosition;
 
-        const handCards = [...playingPosition.hands[0].cards, nextCard as Card];
-        return exceeding21(handCards)
-          ? losePlayingPosition(playingPosition)
-          : doublePlayingPosition(playingPosition, handCards);
-      }
+      const [nextCard, ...cards] = cardsAfterPlayerDecision;
+      cardsAfterPlayerDecision = cards;
 
-      return playingPosition;
+      const handCards = [...playingPosition.hands[0].cards, nextCard as Card];
+      return exceeding21(handCards) ? losePlayingPosition(playingPosition) : doublePlayingPosition(playingPosition, handCards);
     })
   };
 
