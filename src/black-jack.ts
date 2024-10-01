@@ -23,7 +23,7 @@ type Hand = {
 export type PlayingPosition = {
   id: PlayingPositionId;
   availableMoney: number;
-  hands: [Hand] & Hand[];
+  hands: [Hand] | [Hand, Hand];
 };
 
 type Player = {
