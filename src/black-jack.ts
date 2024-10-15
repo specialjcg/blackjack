@@ -6,6 +6,11 @@ type DecksCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type PlayingPositionId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+export type PlayingHand = {
+  playingPositionId: PlayingPositionId;
+  handIndex: 0 | 1;
+};
+
 const VALUES = ['ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k'] as const;
 
 export type Card = (typeof VALUES)[number];
@@ -14,16 +19,18 @@ type Deck = [...typeof VALUES, ...typeof VALUES, ...typeof VALUES, ...typeof VAL
 
 const DECK: Deck = [...VALUES, ...VALUES, ...VALUES, ...VALUES];
 
-type Hand = {
+export type Hand = {
   bettingBox: number;
   cards: Card[];
   isDone: boolean;
 };
 
+export type Hands = [Hand] | [Hand, Hand];
+
 export type PlayingPosition = {
   id: PlayingPositionId;
   availableMoney: number;
-  hands: [Hand] | [Hand, Hand];
+  hands: Hands;
 };
 
 type Player = {
@@ -51,7 +58,7 @@ type BlackJackConfiguration = {
 };
 
 export type BlackJack = {
-  currentPlayerId: PlayingPositionId;
+  currentPlayingHand: PlayingHand;
   playingPositions: PlayingPosition[];
   cards: Card[];
   betRange: BetRange;
@@ -151,5 +158,5 @@ export const BlackJack =
     playingPositions: [],
     cards: shuffler(new Array(blackJackConfiguration.decksCount).fill(DECK).flat()),
     betRange: blackJackConfiguration.bet,
-    currentPlayerId: 0
+    currentPlayingHand: { playingPositionId: 0, handIndex: 0 }
   });

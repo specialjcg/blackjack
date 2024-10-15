@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bet, BetRange, BlackJack, Card, deal, join, Shuffler } from './black-jack';
 import {
+  OnlyDoubleWhenNoSplit,
   OnlySplitEqualCardsError,
   OnlySplitFirstTurnError,
   playerDoubleDecision,
@@ -27,7 +28,7 @@ const HIGH_SHUFFLER: Shuffler = () => [
 ];
 
 const SPLIT_SHUFFLER: Shuffler = () => [
-  ...(['3', '3', 'q', '4', '3', '5', '5', '6', '4', '10', '7', '10', '7'] as Card[]),
+  ...(['3', '3', '5', '4', '3', '5', '5', '6', '4', '10', '7', '10', '7'] as Card[]),
   ...(['k', '4', '7', '7', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'] as Card[]),
   ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
   ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
@@ -161,7 +162,7 @@ describe('blackJack game', () => {
         { id: 0, availableMoney: 450, hands: [{ bettingBox: 50, cards: ['j', 'j'], isDone: false }] },
         { id: 1, availableMoney: 500, hands: [{ bettingBox: 100, cards: ['6', '5'], isDone: false }] }
       ],
-      currentPlayerId: 0
+      currentPlayingHand: { playingPositionId: 0, handIndex: 0 }
     });
   });
 
@@ -238,7 +239,7 @@ describe('blackJack game', () => {
     expect(played.playingPositions.at(0)?.hands[0].bettingBox).toBe(50);
     expect(played.playingPositions.at(0)?.availableMoney).toBe(450);
     expect(played.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['2', '3', '5']);
-    expect(played.currentPlayerId).toStrictEqual(1);
+    expect(played.currentPlayingHand).toStrictEqual({ playingPositionId: 1, handIndex: 0 });
   });
 
   it('should not hit a second time while every player has not played', () => {
@@ -247,7 +248,7 @@ describe('blackJack game', () => {
     const playerOnePlayed = playerHitDecision(readyGame)();
     const playerTwoPlayed = playerHitDecision(playerOnePlayed)();
 
-    expect(playerTwoPlayed.currentPlayerId).toStrictEqual(0);
+    expect(playerTwoPlayed.currentPlayingHand).toStrictEqual({ playingPositionId: 0, handIndex: 0 });
   });
 
   it('should ignore player surrander player with two players', () => {
@@ -255,7 +256,7 @@ describe('blackJack game', () => {
     const playerOneSurrender = playerSurrenderDecision(readyGame)();
     const playerTwoPlayed = playerHitDecision(playerOneSurrender)();
 
-    expect(playerTwoPlayed.currentPlayerId).toStrictEqual(1);
+    expect(playerTwoPlayed.currentPlayingHand).toStrictEqual({ playingPositionId: 1, handIndex: 0 });
   });
 
   it('should ignore player surrander player with three players', () => {
@@ -265,7 +266,7 @@ describe('blackJack game', () => {
     const playerThreeSurrender = playerSurrenderDecision(playerTwoSurrender)();
     const playerFourPlayed = playerHitDecision(playerThreeSurrender)();
 
-    expect(playerFourPlayed.currentPlayerId).toStrictEqual(3);
+    expect(playerFourPlayed.currentPlayingHand).toStrictEqual({ playingPositionId: 3, handIndex: 0 });
   });
 
   it('should lose after some hits for first player', () => {
@@ -308,9 +309,56 @@ describe('blackJack game', () => {
     }).toThrowError(new OnlySplitFirstTurnError());
   });
 
+  it('should manage player with two hands for split decision', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const playerOneSplit = playerSplitDecision(readyGame)(10);
+    const playerTwoPlayed = playerHitDecision(playerOneSplit)();
+    const playerOneHitForHand1 = playerHitDecision(playerTwoPlayed)();
+    const playerOneHitForHand2 = playerHitDecision(playerOneHitForHand1)();
+
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['3', '5', '4']);
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[1]?.cards).toStrictEqual(['3', '5', '10']);
+    expect(playerOneHitForHand2.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['5', '4', '6']);
+  });
+
+  it('should forbid double after a split', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const playerOneSplit = playerSplitDecision(readyGame)(10);
+    const playerTwoPlayed = playerHitDecision(playerOneSplit)();
+
+    expect(() => {
+      playerDoubleDecision(playerTwoPlayed)();
+    }).toThrowError(new OnlyDoubleWhenNoSplit());
+  });
+
+  it('should manage player with two hands for stand decision', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const playerOneSplit = playerSplitDecision(readyGame)(10);
+    const playerTwoPlayed = playerHitDecision(playerOneSplit)();
+    const playerOneStandForHand1 = playerStandDecision(playerTwoPlayed)();
+    const playerOneHitForHand2 = playerHitDecision(playerOneStandForHand1)();
+
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['3', '5']);
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[1]?.cards).toStrictEqual(['3', '5', '4']);
+    expect(playerOneHitForHand2.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['5', '4', '6']);
+  });
+
+  it('should manage player with two hands for surrender decision', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const playerOneSplit = playerSplitDecision(readyGame)(10);
+    const playerTwoPlayed = playerHitDecision(playerOneSplit)();
+    const playerOneSurrenderForHand1 = playerSurrenderDecision(playerTwoPlayed)();
+    const playerOneHitForHand2 = playerHitDecision(playerOneSurrenderForHand1)();
+
+    expect(playerOneHitForHand2.playingPositions.at(0)?.availableMoney).toStrictEqual(465);
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['3', '5']);
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[0].isDone).toStrictEqual(true);
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[0].bettingBox).toStrictEqual(0);
+    expect(playerOneHitForHand2.playingPositions.at(0)?.hands[1]?.cards).toStrictEqual(['3', '5', '4']);
+    expect(playerOneHitForHand2.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['5', '4', '6']);
+  });
+
   // todo:
-  //  - manage player with two hands
-  //  - cannot double after split
   //  - rules with as 1 or 11
   //  - Dealer second card
   //  - what if all players are done

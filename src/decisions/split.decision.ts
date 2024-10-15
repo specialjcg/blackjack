@@ -56,7 +56,7 @@ export const playerSplitDecision =
     const gameUpdate: BlackJack = {
       ...game,
       playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
-        if (game.currentPlayerId !== playingPosition.id) return playingPosition;
+        if (game.currentPlayingHand.playingPositionId !== playingPosition.id) return playingPosition;
 
         const [hand1Card, hand2Card, ...cards] = cardsAfterPlayerDecision as [Card, Card];
         cardsAfterPlayerDecision = cards;
@@ -67,7 +67,10 @@ export const playerSplitDecision =
 
     return {
       ...gameUpdate,
-      currentPlayerId: nextPlayerId(game),
+      currentPlayingHand: {
+        playingPositionId: nextPlayerId(game),
+        handIndex: 0
+      },
       cards: cardsAfterPlayerDecision
     };
   };
