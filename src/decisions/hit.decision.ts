@@ -1,12 +1,5 @@
 import { BlackJack, Card, Hand, Hands, PlayingPosition } from '../black-jack';
-import {
-  availablePlayerNextHand,
-  curentPlayingPositionFor,
-  exceeding21,
-  losePlayingPosition,
-  nextHand,
-  nextPLayer
-} from './decision-commons';
+import { exceeding21, losePlayingPosition, prepareNextTurn } from './decision-commons';
 
 const toUpdateHitHandsCards =
   (handIndex: number, cards: Card[]) =>
@@ -18,7 +11,7 @@ const hitPlayingPosition = (playingPosition: PlayingPosition, cards: Card[], han
   hands: playingPosition.hands.map(toUpdateHitHandsCards(handIndex, cards)) as Hands
 });
 
-export const playerHitDecision = (game: BlackJack) => (): BlackJack => {
+export const hitDecision = (game: BlackJack) => (): BlackJack => {
   let cardsAfterPlayerDecision: Card[] = game.cards;
 
   // todo: refactor
@@ -35,7 +28,7 @@ export const playerHitDecision = (game: BlackJack) => (): BlackJack => {
         ];
 
         return exceeding21(handCards)
-          ? losePlayingPosition(playingPosition)
+          ? losePlayingPosition(playingPosition, handCards)
           : hitPlayingPosition(playingPosition, handCards, game.currentPlayingHand.handIndex);
       }
 
@@ -43,9 +36,5 @@ export const playerHitDecision = (game: BlackJack) => (): BlackJack => {
     })
   };
 
-  return {
-    ...gameUpdate,
-    currentPlayingHand: availablePlayerNextHand(game)(curentPlayingPositionFor(game)) ? nextHand(game) : nextPLayer(game),
-    cards: cardsAfterPlayerDecision
-  };
+  return prepareNextTurn(game)(gameUpdate, cardsAfterPlayerDecision, true);
 };

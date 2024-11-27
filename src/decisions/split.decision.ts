@@ -1,5 +1,5 @@
 import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import { nextPlayerId } from './decision-commons';
+import { prepareNextTurn } from './decision-commons';
 
 export class OnlySplitEqualCardsError extends Error {
   public constructor(card1: Card, card2: Card) {
@@ -48,11 +48,12 @@ const doublePlayingPosition = (playingPosition: PlayingPosition, split: InitSpli
   };
 };
 
-export const playerSplitDecision =
+export const splitDecision =
   (game: BlackJack) =>
   (bet: number): BlackJack => {
     let cardsAfterPlayerDecision: Card[] = game.cards;
 
+    // todo: refactor
     const gameUpdate: BlackJack = {
       ...game,
       playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
@@ -65,12 +66,5 @@ export const playerSplitDecision =
       })
     };
 
-    return {
-      ...gameUpdate,
-      currentPlayingHand: {
-        playingPositionId: nextPlayerId(game),
-        handIndex: 0
-      },
-      cards: cardsAfterPlayerDecision
-    };
+    return prepareNextTurn(game)(gameUpdate, cardsAfterPlayerDecision, false);
   };

@@ -1,5 +1,5 @@
 import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import { exceeding21, losePlayingPosition, nextPlayerId } from './decision-commons';
+import { exceeding21, losePlayingPosition, prepareNextTurn } from './decision-commons';
 
 export class OnlyDoubleWhenNoSplit extends Error {
   public constructor() {
@@ -20,10 +20,10 @@ const doublePlayingPosition = (playingPosition: PlayingPosition, cards: Card[]):
   ]
 });
 
-// todo: cannot double after split
 export const playerDoubleDecision = (game: BlackJack) => (): BlackJack => {
   let cardsAfterPlayerDecision: Card[] = game.cards;
 
+  // todo: refactor
   const gameUpdate: BlackJack = {
     ...game,
     playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
@@ -35,16 +35,11 @@ export const playerDoubleDecision = (game: BlackJack) => (): BlackJack => {
       cardsAfterPlayerDecision = cards;
 
       const handCards = [...playingPosition.hands[0].cards, nextCard as Card];
-      return exceeding21(handCards) ? losePlayingPosition(playingPosition) : doublePlayingPosition(playingPosition, handCards);
+      return exceeding21(handCards)
+        ? losePlayingPosition(playingPosition, handCards)
+        : doublePlayingPosition(playingPosition, handCards);
     })
   };
 
-  return {
-    ...gameUpdate,
-    currentPlayingHand: {
-      playingPositionId: nextPlayerId(game),
-      handIndex: 0
-    },
-    cards: cardsAfterPlayerDecision
-  };
+  return prepareNextTurn(game)(gameUpdate, cardsAfterPlayerDecision, false);
 };

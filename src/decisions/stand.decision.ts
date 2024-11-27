@@ -1,5 +1,5 @@
 import { BlackJack, Hand, Hands, PlayingPosition } from '../black-jack';
-import { availablePlayerNextHand, curentPlayingPositionFor, nextHand, nextPLayer } from './decision-commons';
+import { prepareNextTurn } from './decision-commons';
 
 const toUpdateStandHandsCards =
   (handIndex: number) =>
@@ -21,8 +21,5 @@ const updatePlayingPosition = (game: BlackJack): BlackJack => ({
   playingPositions: game.playingPositions.map(toStandForPlayer(game))
 });
 
-export const playerStandDecision = (game: BlackJack) => (): BlackJack => ({
-  ...updatePlayingPosition(game),
-  currentPlayingHand: availablePlayerNextHand(game)(curentPlayingPositionFor(game)) ? nextHand(game) : nextPLayer(game),
-  cards: game.cards
-});
+export const standDecision = (game: BlackJack) => (): BlackJack =>
+  prepareNextTurn(game)(updatePlayingPosition(game), game.cards, true);

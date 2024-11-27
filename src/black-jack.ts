@@ -1,5 +1,7 @@
 // https://en.wikipedia.org/wiki/Blackjack
 
+import { computeHandValue, exceeding21, isHigherValue } from './decisions/decision-commons';
+
 type PlayingPositionCount = 5 | 6 | 7 | 8 | 9;
 
 type DecksCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -21,6 +23,11 @@ const DECK: Deck = [...VALUES, ...VALUES, ...VALUES, ...VALUES];
 
 export type Hand = {
   bettingBox: number;
+  cards: Card[];
+  isDone: boolean;
+};
+
+export type DealerHand = {
   cards: Card[];
   isDone: boolean;
 };
@@ -62,7 +69,7 @@ export type BlackJack = {
   playingPositions: PlayingPosition[];
   cards: Card[];
   betRange: BetRange;
-  dealerHand: Card[];
+  dealerHand: DealerHand;
 };
 
 export type Shuffler = (cards: Card[]) => Card[];
@@ -71,6 +78,10 @@ const matchingId =
   <T>(idToCheck: T) =>
   ({ id }: { id: T }): boolean =>
     id === idToCheck;
+
+function emptyPlayerHand() {
+  return { bettingBox: 0, cards: [], isDone: false };
+}
 
 export const join =
   (game: BlackJack) =>
@@ -85,7 +96,7 @@ export const join =
         {
           ...player,
           id: playingPositionId,
-          hands: [{ bettingBox: 0, cards: [], isDone: false }]
+          hands: [emptyPlayerHand()]
         }
       ]
     };
@@ -147,16 +158,78 @@ export const deal = (game: BlackJack): BlackJack => {
 
   return {
     ...game,
-    ...{ playingPositions, dealerHand: dealerHand == null ? [] : [dealerHand], cards }
+    ...{
+      playingPositions,
+      dealerHand:
+        dealerHand == null
+          ? {
+              isDone: false,
+              cards: []
+            }
+          : {
+              isDone: false,
+              cards: [dealerHand]
+            },
+      cards
+    }
   };
 };
+
+const emptyDealerHand = (): DealerHand => ({ cards: [], isDone: false });
+
+const resetPlayingPosition = (): PlayingHand => ({ playingPositionId: 0, handIndex: 0 });
 
 export const BlackJack =
   (shuffler: Shuffler) =>
   (blackJackConfiguration: BlackJackConfiguration): BlackJack => ({
-    dealerHand: [],
+    dealerHand: emptyDealerHand(),
     playingPositions: [],
     cards: shuffler(new Array(blackJackConfiguration.decksCount).fill(DECK).flat()),
     betRange: blackJackConfiguration.bet,
-    currentPlayingHand: { playingPositionId: 0, handIndex: 0 }
+    currentPlayingHand: resetPlayingPosition()
   });
+
+export const isGameFinished = (game: BlackJack): boolean =>
+  game.dealerHand.isDone && game.playingPositions.every(({ hands }) => hands.every(({ isDone }) => isDone));
+
+const isWinner =
+  ({ dealerHand: { cards: dealerCards } }: BlackJack) =>
+  ({ cards }: Hand): boolean =>
+    !exceeding21(cards) && (isHigherValue(cards)(dealerCards) || exceeding21(dealerCards));
+
+const isDraw =
+  ({ dealerHand: { cards: dealerCards } }: BlackJack) =>
+  ({ cards }: Hand): boolean =>
+    computeHandValue(dealerCards) === computeHandValue(cards);
+
+type GainMatching = {
+  decision: (game: BlackJack) => (hand: Hand) => boolean;
+  apply: (hand: Hand) => number;
+};
+
+const gainMatching: GainMatching[] = [
+  { decision: isWinner, apply: (hand: Hand) => hand.bettingBox * 2 },
+  { decision: isDraw, apply: (hand: Hand) => hand.bettingBox }
+];
+
+const toMatchingGain =
+  (game: BlackJack) =>
+  (hand: Hand) =>
+  (gain: number, { decision, apply }: GainMatching) =>
+    decision(game)(hand) ? apply(hand) : gain;
+
+const toPlayerGain =
+  (game: BlackJack) =>
+  (gain: number, hand: Hand): number =>
+    gainMatching.reduce(toMatchingGain(game)(hand), gain);
+
+export const gameEnd = (game: BlackJack): BlackJack => ({
+  ...game,
+  dealerHand: emptyDealerHand(),
+  playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => ({
+    ...playingPosition,
+    availableMoney: playingPosition.availableMoney + playingPosition.hands.reduce(toPlayerGain(game), 0),
+    hands: [emptyPlayerHand()]
+  })),
+  currentPlayingHand: resetPlayingPosition()
+});
