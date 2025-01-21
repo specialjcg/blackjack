@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { bet, BetRange, BlackJack, Card, deal, gameEnd, isGameFinished, join, Shuffler } from './black-jack';
+import { bet, BetRange, BlackJack, Card, gameEnd, isGameFinished, join, leave, Shuffler } from './black-jack';
+import { deal } from './deal';
 import {
-  OnlyDoubleWhenNoSplit,
+  OnlyDoubleWhenNoSplitError,
   OnlySplitEqualCardsError,
   OnlySplitFirstTurnError,
-  playerDoubleDecision,
+  doubleDecision,
   hitDecision,
   splitDecision,
   standDecision,
@@ -217,7 +218,7 @@ describe('blackJack game', () => {
   it('should double for first player', () => {
     const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
 
-    const fisrtPlayerPlayed = playerDoubleDecision(readyGame)();
+    const fisrtPlayerPlayed = doubleDecision(readyGame)();
 
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].isDone).toBe(true);
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].bettingBox).toBe(100);
@@ -225,7 +226,7 @@ describe('blackJack game', () => {
     expect(fisrtPlayerPlayed.playingPositions.at(0)?.hands[0].cards).toStrictEqual(['2', '3', '5']);
     expect(fisrtPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['5', '6', '4']);
 
-    const secondPlayerPlayed = playerDoubleDecision(fisrtPlayerPlayed)();
+    const secondPlayerPlayed = doubleDecision(fisrtPlayerPlayed)();
     expect(secondPlayerPlayed.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['4', '5', '5']);
     expect(secondPlayerPlayed.cards.slice(0, 3)).toStrictEqual(['6', '4', '1']);
   });
@@ -290,6 +291,39 @@ describe('blackJack game', () => {
     expect(played.playingPositions.at(0)?.availableMoney).toBe(440);
   });
 
+  it('should use next player second hand when first hand is done', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const player1SplitTurn1 = splitDecision(readyGame)(10);
+    const player2HitTurn1 = hitDecision(player1SplitTurn1)();
+    const player1HitTurn2Hand1 = hitDecision(player2HitTurn1)();
+    const player1HitTurn2Hand2 = hitDecision(player1HitTurn2Hand1)();
+    const player2HitTurn2 = hitDecision(player1HitTurn2Hand2)();
+    const player1HitTurn3Hand1 = hitDecision(player2HitTurn2)();
+    const player1HitTurn3Hand2 = hitDecision(player1HitTurn3Hand1)();
+    const player1HitTurn4Hand1 = hitDecision(player1HitTurn3Hand2)();
+
+    expect(player1HitTurn4Hand1.playingPositions.at(0)?.hands).toStrictEqual([
+      { isDone: true, bettingBox: 0, cards: ['3', '5', '10', 'k'] },
+      { isDone: true, bettingBox: 0, cards: ['3', '5', '7', '4', '7'] }
+    ]);
+  });
+
+  it('should continue to play when hand 0 is done but not hand 1', () => {
+    const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
+    const gameAfterSplitForPLayer1 = splitDecision(readyGame)(10);
+
+    const gameAfterSurrenderForPlayer2 = surrenderDecision(gameAfterSplitForPLayer1)();
+    const turn1AfterSplit = hitDecision(gameAfterSurrenderForPlayer2)();
+    const turn2AfterSplit = hitDecision(turn1AfterSplit)();
+    const turn3AfterSplit = hitDecision(turn2AfterSplit)();
+    const turn4AfterSplit = hitDecision(turn3AfterSplit)();
+
+    expect(turn4AfterSplit.playingPositions.at(0)?.hands).toStrictEqual([
+      { isDone: false, bettingBox: 50, cards: ['3', '5', '4', '7'] },
+      { isDone: true, bettingBox: 0, cards: ['3', '5', '10', '10'] }
+    ]);
+  });
+
   it('should only allow split when cards are equals', () => {
     const readyGame = readyGameWithTwoPlayers(HIGH_SHUFFLER);
 
@@ -321,14 +355,34 @@ describe('blackJack game', () => {
     expect(playerOneHitForHand2.playingPositions.at(1)?.hands[0].cards).toStrictEqual(['5', '4', '6']);
   });
 
+  it('should not switch to next ready player when next plyer second hand is not done', () => {
+    const shuffler = () => [
+      ...(['10', '10', '2', '2', '3', 'k', '2', '3', '3', '10', '7', '4', 'ace'] as Card[]),
+      ...(['ace', '8', '5', '6', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'] as Card[]),
+      ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
+      ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
+    ];
+
+    const readyGame = readyGameWithTwoPlayers(shuffler);
+    const playerOneSplit = splitDecision(readyGame)(10);
+    const playerTwoSplit = splitDecision(playerOneSplit)(10);
+    const playerOneHitForHand1Turn1 = hitDecision(playerTwoSplit)();
+    const playerOneHitForHand2Turn1 = hitDecision(playerOneHitForHand1Turn1)();
+    const playerTwoHitForHand1Turn1 = hitDecision(playerOneHitForHand2Turn1)();
+    const playerTwoHitForHand2Turn1 = hitDecision(playerTwoHitForHand1Turn1)();
+    const playerOneHitForHand1Turn2 = hitDecision(playerTwoHitForHand2Turn1)();
+
+    expect(playerOneHitForHand1Turn2.playingPositions.at(0)?.hands[1]?.cards).toStrictEqual(['10', '2', '4', '5']);
+  });
+
   it('should forbid double after a split', () => {
     const readyGame = readyGameWithTwoPlayers(SPLIT_SHUFFLER);
     const playerOneSplit = splitDecision(readyGame)(10);
     const playerTwoPlayed = hitDecision(playerOneSplit)();
 
     expect(() => {
-      playerDoubleDecision(playerTwoPlayed)();
-    }).toThrowError(new OnlyDoubleWhenNoSplit());
+      doubleDecision(playerTwoPlayed)();
+    }).toThrowError(new OnlyDoubleWhenNoSplitError());
   });
 
   it('should manage player with two hands for stand decision', () => {
@@ -528,8 +582,73 @@ describe('blackJack game', () => {
     expect(nextGame.playingPositions.at(0)?.availableMoney).toBe(550);
   });
 
-  // todo:
-  //  - Player without money
-  //  - Leave playing position
-  //  - are all [0] OK ?
+  it('should remove player without money from ext game', () => {
+    const gameToTest: BlackJack = {
+      dealerHand: { cards: ['10', '8', '4'], isDone: true },
+      betRange: BetRange({ min: 5, max: 100 }),
+      cards: ['10', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'],
+      playingPositions: [
+        { id: 0, availableMoney: 0, hands: [{ bettingBox: 50, cards: ['10', 'k', 'j'], isDone: true }] },
+        { id: 1, availableMoney: 500, hands: [{ bettingBox: 100, cards: ['4', 'ace'], isDone: true }] }
+      ],
+      currentPlayingHand: { playingPositionId: 0, handIndex: 0 }
+    };
+
+    const nextGame = gameEnd(gameToTest);
+
+    expect(nextGame.playingPositions).toStrictEqual([
+      { id: 1, availableMoney: 700, hands: [{ bettingBox: 0, cards: [], isDone: false }] }
+    ]);
+  });
+
+  it('should be able to quit the game when game has not started', () => {
+    const gameToTest: BlackJack = {
+      dealerHand: { cards: ['10', '8', '4'], isDone: true },
+      betRange: BetRange({ min: 5, max: 100 }),
+      cards: ['10', 'j', '4', 'ace', '10', '9', '3', '8', 'k', 'ace'],
+      playingPositions: [
+        { id: 0, availableMoney: 450, hands: [{ bettingBox: 50, cards: ['10', 'k'], isDone: true }] },
+        { id: 1, availableMoney: 500, hands: [{ bettingBox: 100, cards: ['4', 'ace'], isDone: true }] }
+      ],
+      currentPlayingHand: { playingPositionId: 0, handIndex: 0 }
+    };
+
+    const nextGame = gameEnd(gameToTest);
+
+    const nextGameWithoutPlayer1 = leave(nextGame)(0);
+
+    expect(nextGameWithoutPlayer1.playingPositions).toStrictEqual([
+      { id: 1, availableMoney: 700, hands: [{ bettingBox: 0, cards: [], isDone: false }] }
+    ]);
+  });
+
+  it('should not be possible to leave a started game', () => {
+    const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
+
+    const turnOnePlayerOne = hitDecision(readyGame)();
+    const turnOnePlayerTwo = hitDecision(turnOnePlayerOne)();
+    const turnTwoPlayerOne = hitDecision(turnOnePlayerTwo)();
+    const turnTwoPlayerTwo = hitDecision(turnTwoPlayerOne)();
+    const turnThreePlayerOne = hitDecision(turnTwoPlayerTwo)();
+    const turnThreePlayerTwo = hitDecision(turnThreePlayerOne)();
+
+    expect(() => {
+      leave(turnThreePlayerTwo)(0);
+    }).toThrowError('Cannot leave a started game');
+  });
+
+  it('should not be possible to end a game that is not finished', () => {
+    const readyGame = readyGameWithTwoPlayers(LOW_SHUFFLER);
+
+    const turnOnePlayerOne = hitDecision(readyGame)();
+    const turnOnePlayerTwo = hitDecision(turnOnePlayerOne)();
+    const turnTwoPlayerOne = hitDecision(turnOnePlayerTwo)();
+    const turnTwoPlayerTwo = hitDecision(turnTwoPlayerOne)();
+    const turnThreePlayerOne = hitDecision(turnTwoPlayerTwo)();
+    const turnThreePlayerTwo = hitDecision(turnThreePlayerOne)();
+
+    expect(() => {
+      gameEnd(turnThreePlayerTwo);
+    }).toThrowError('Game is not finished yet');
+  });
 });

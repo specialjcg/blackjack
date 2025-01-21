@@ -1,45 +1,81 @@
 import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import { exceeding21, losePlayingPosition, prepareNextTurn } from './decision-commons';
+import { Hands } from '../player-hands';
+import {
+  addNextCard,
+  exceeding21,
+  initNextTurn,
+  isPlaying,
+  losePlayingPosition,
+  NextTurn,
+  noChangeFor,
+  prepareNextTurn
+} from './decision-commons';
 
-export class OnlyDoubleWhenNoSplit extends Error {
+export class OnlyDoubleWhenNoSplitError extends Error {
   public constructor() {
     super(`You can only double when you have not split`);
   }
 }
 
-const doublePlayingPosition = (playingPosition: PlayingPosition, cards: Card[]): PlayingPosition => ({
-  ...playingPosition,
-  availableMoney: playingPosition.availableMoney - playingPosition.hands[0].bettingBox,
-  hands: [
+const HAND_TO_DOUBLE_INDEX = 0 as const;
+
+const updateDoubleHandsCards =
+  (playingPosition: PlayingPosition) =>
+  (cards: Card[]): Hands => [
     {
-      ...playingPosition.hands[0],
+      ...playingPosition.hands[HAND_TO_DOUBLE_INDEX],
       isDone: true,
-      bettingBox: playingPosition.hands[0].bettingBox * 2,
+      bettingBox: playingPosition.hands[HAND_TO_DOUBLE_INDEX].bettingBox * 2,
       cards
     }
-  ]
-});
+  ];
 
-export const playerDoubleDecision = (game: BlackJack) => (): BlackJack => {
-  let cardsAfterPlayerDecision: Card[] = game.cards;
+const removeSameBetFromAvailableMoney = (playingPosition: PlayingPosition): number =>
+  playingPosition.availableMoney - playingPosition.hands[HAND_TO_DOUBLE_INDEX].bettingBox;
 
-  // todo: refactor
-  const gameUpdate: BlackJack = {
-    ...game,
-    playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
-      if (game.currentPlayingHand.playingPositionId !== playingPosition.id) return playingPosition;
+const doublePlayingPosition =
+  (playingPosition: PlayingPosition) =>
+  (cards: Card[]): PlayingPosition => ({
+    ...playingPosition,
+    availableMoney: removeSameBetFromAvailableMoney(playingPosition),
+    hands: updateDoubleHandsCards(playingPosition)(cards)
+  });
 
-      if (playingPosition.hands.length > 1) throw new OnlyDoubleWhenNoSplit();
+const updatePlayingPositions =
+  (game: BlackJack) =>
+  (nextCard: Card, { playingPosition, nextTurn }: { playingPosition: PlayingPosition; nextTurn: NextTurn }) => {
+    const handCards: Card[] = addNextCard(game)(playingPosition, nextCard);
 
-      const [nextCard, ...cards] = cardsAfterPlayerDecision;
-      cardsAfterPlayerDecision = cards;
-
-      const handCards = [...playingPosition.hands[0].cards, nextCard as Card];
-      return exceeding21(handCards)
-        ? losePlayingPosition(playingPosition, handCards)
-        : doublePlayingPosition(playingPosition, handCards);
-    })
+    return [
+      ...nextTurn.playingPositions,
+      exceeding21(handCards)
+        ? losePlayingPosition(playingPosition)(handCards, game.currentPlayingHand.handIndex)
+        : doublePlayingPosition(playingPosition)(handCards)
+    ];
   };
 
-  return prepareNextTurn(game)(gameUpdate, cardsAfterPlayerDecision, false);
+const nextTurnFor =
+  (game: BlackJack) => (playingPositionToUpdate: { playingPosition: PlayingPosition; nextTurn: NextTurn }) => {
+    const [nextCard, ...cards] = playingPositionToUpdate.nextTurn.cards as [Card, ...Card[]];
+
+    return {
+      playingPositions: updatePlayingPositions(game)(nextCard, playingPositionToUpdate),
+      cards
+    };
+  };
+
+const toNextTurn =
+  (game: BlackJack) =>
+  (nextTurn: NextTurn, playingPosition: PlayingPosition): NextTurn =>
+    isPlaying(game)(playingPosition)
+      ? nextTurnFor(game)({ playingPosition, nextTurn })
+      : noChangeFor(playingPosition)(nextTurn);
+
+export const doubleDecision = (game: BlackJack) => (): BlackJack => {
+  if (game.playingPositions.some((playingPosition: PlayingPosition) => playingPosition.hands.length > 1))
+    throw new OnlyDoubleWhenNoSplitError();
+
+  const nextTurn: NextTurn = game.playingPositions.reduce(toNextTurn(game), initNextTurn(game));
+
+  return prepareNextTurn(game)({ ...game, playingPositions: nextTurn.playingPositions }, nextTurn.cards, false);
 };

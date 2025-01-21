@@ -1,5 +1,6 @@
 import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import { prepareNextTurn } from './decision-commons';
+import { Hands } from '../player-hands';
+import { initNextTurn, isPlaying, NextTurn, noChangeFor, prepareNextTurn } from './decision-commons';
 
 export class OnlySplitEqualCardsError extends Error {
   public constructor(card1: Card, card2: Card) {
@@ -19,52 +20,75 @@ type InitSplit = {
   bet: number;
 };
 
-const doublePlayingPosition = (playingPosition: PlayingPosition, split: InitSplit): PlayingPosition => {
-  const [hand1Card, hand2Card] = playingPosition.hands[0].cards as [Card, Card];
+const HAND_TO_SPLIT_INDEX = 0 as const;
 
-  if (playingPosition.hands[0].cards.length > 2) {
-    throw new OnlySplitFirstTurnError();
-  }
+const updateSplitHandsCards =
+  (playingPosition: PlayingPosition) =>
+  (split: InitSplit, [hand1Card, hand2Card]: [Card, Card]): Hands => [
+    {
+      isDone: false,
+      bettingBox: playingPosition.hands[HAND_TO_SPLIT_INDEX].bettingBox,
+      cards: [hand1Card, split.hand1Card]
+    },
+    {
+      isDone: false,
+      bettingBox: split.bet,
+      cards: [hand2Card, split.hand2Card]
+    }
+  ];
 
-  if (hand1Card != hand2Card) {
-    throw new OnlySplitEqualCardsError(hand1Card, hand2Card);
-  }
+const removeSplitBetFromAvailableMoney = (playingPosition: PlayingPosition, split: InitSplit) =>
+  playingPosition.availableMoney - split.bet;
+
+const splitPlayingPosition =
+  (playingPosition: PlayingPosition) =>
+  (split: InitSplit): PlayingPosition => {
+    const [hand1Card, hand2Card] = playingPosition.hands[HAND_TO_SPLIT_INDEX].cards as [Card, Card];
+
+    if (playingPosition.hands[HAND_TO_SPLIT_INDEX].cards.length > 2) {
+      throw new OnlySplitFirstTurnError();
+    }
+
+    if (hand1Card != hand2Card) {
+      throw new OnlySplitEqualCardsError(hand1Card, hand2Card);
+    }
+
+    return {
+      ...playingPosition,
+      availableMoney: removeSplitBetFromAvailableMoney(playingPosition, split),
+      hands: updateSplitHandsCards(playingPosition)(split, [hand1Card, hand2Card])
+    };
+  };
+
+const updatePlayingPosition = (
+  playingPositionToUpdate: {
+    playingPosition: PlayingPosition;
+    nextTurn: NextTurn;
+  },
+  initSplit: InitSplit
+) => [
+  ...playingPositionToUpdate.nextTurn.playingPositions,
+  splitPlayingPosition(playingPositionToUpdate.playingPosition)(initSplit)
+];
+
+const nextTurnFor = (bet: number) => (playingPositionToUpdate: { playingPosition: PlayingPosition; nextTurn: NextTurn }) => {
+  const [hand1Card, hand2Card, ...cards] = playingPositionToUpdate.nextTurn.cards as [Card, Card, ...Card[]];
 
   return {
-    ...playingPosition,
-    availableMoney: playingPosition.availableMoney - split.bet,
-    hands: [
-      {
-        isDone: false,
-        bettingBox: playingPosition.hands[0].bettingBox,
-        cards: [hand1Card, split.hand1Card]
-      },
-      {
-        isDone: false,
-        bettingBox: split.bet,
-        cards: [hand2Card, split.hand2Card]
-      }
-    ]
+    playingPositions: updatePlayingPosition(playingPositionToUpdate, { hand1Card, hand2Card, bet }),
+    cards
   };
 };
+
+const toNextTurn =
+  (game: BlackJack, bet: number) =>
+  (nextTurn: NextTurn, playingPosition: PlayingPosition): NextTurn =>
+    isPlaying(game)(playingPosition) ? nextTurnFor(bet)({ playingPosition, nextTurn }) : noChangeFor(playingPosition)(nextTurn);
 
 export const splitDecision =
   (game: BlackJack) =>
   (bet: number): BlackJack => {
-    let cardsAfterPlayerDecision: Card[] = game.cards;
+    const nextTurn: NextTurn = game.playingPositions.reduce(toNextTurn(game, bet), initNextTurn(game));
 
-    // todo: refactor
-    const gameUpdate: BlackJack = {
-      ...game,
-      playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => {
-        if (game.currentPlayingHand.playingPositionId !== playingPosition.id) return playingPosition;
-
-        const [hand1Card, hand2Card, ...cards] = cardsAfterPlayerDecision as [Card, Card];
-        cardsAfterPlayerDecision = cards;
-
-        return doublePlayingPosition(playingPosition, { hand1Card, hand2Card, bet });
-      })
-    };
-
-    return prepareNextTurn(game)(gameUpdate, cardsAfterPlayerDecision, false);
+    return prepareNextTurn(game)({ ...game, playingPositions: nextTurn.playingPositions }, nextTurn.cards, false);
   };

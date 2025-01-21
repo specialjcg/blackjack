@@ -1,5 +1,6 @@
-import { BlackJack, Hand, Hands, PlayingPosition } from '../black-jack';
+import { BlackJack, PlayingPosition } from '../black-jack';
 import { prepareNextTurn } from './decision-commons';
+import { Hand, Hands } from '../player-hands';
 
 const toUpdateStandHandsCards =
   (handIndex: number) =>

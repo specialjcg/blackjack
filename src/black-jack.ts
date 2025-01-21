@@ -1,6 +1,8 @@
 // https://en.wikipedia.org/wiki/Blackjack
 
 import { computeHandValue, exceeding21, isHigherValue } from './decisions/decision-commons';
+import { STARTING_HAND_INDEX } from './hand';
+import { Hand, Hands, handsAreDone } from './player-hands';
 
 type PlayingPositionCount = 5 | 6 | 7 | 8 | 9;
 
@@ -21,18 +23,10 @@ type Deck = [...typeof VALUES, ...typeof VALUES, ...typeof VALUES, ...typeof VAL
 
 const DECK: Deck = [...VALUES, ...VALUES, ...VALUES, ...VALUES];
 
-export type Hand = {
-  bettingBox: number;
-  cards: Card[];
-  isDone: boolean;
-};
-
 export type DealerHand = {
   cards: Card[];
   isDone: boolean;
 };
-
-export type Hands = [Hand] | [Hand, Hand];
 
 export type PlayingPosition = {
   id: PlayingPositionId;
@@ -79,33 +73,39 @@ const matchingId =
   ({ id }: { id: T }): boolean =>
     id === idToCheck;
 
-function emptyPlayerHand() {
-  return { bettingBox: 0, cards: [], isDone: false };
+const EMPTY_PLAYER_HAND = { bettingBox: 0, cards: [], isDone: false };
+
+const isAlreadyTaken = (game: BlackJack) => (playingPositionId: PlayingPositionId) =>
+  game.playingPositions.find(matchingId(playingPositionId)) != null;
+
+class PositionNotAvailableError extends Error {
+  public constructor() {
+    super('This playing position is already taken');
+  }
 }
+
+const newPlayingPositionFor =
+  (player: Player) =>
+  (playingPositionId: PlayingPositionId): PlayingPosition => ({
+    ...player,
+    id: playingPositionId,
+    hands: [EMPTY_PLAYER_HAND]
+  });
 
 export const join =
   (game: BlackJack) =>
   (player: Player, playingPositionId: PlayingPositionId): BlackJack => {
-    if (game.playingPositions.find(matchingId(playingPositionId)) != null)
-      throw new Error('This playing position is already taken');
-
+    if (isAlreadyTaken(game)(playingPositionId)) throw new PositionNotAvailableError();
     return {
       ...game,
-      playingPositions: [
-        ...game.playingPositions,
-        {
-          ...player,
-          id: playingPositionId,
-          hands: [emptyPlayerHand()]
-        }
-      ]
+      playingPositions: [...game.playingPositions, newPlayingPositionFor(player)(playingPositionId)]
     };
   };
 
 const applyBet = (playingPosition: PlayingPosition, amount: number): PlayingPosition => ({
   id: playingPosition.id,
   availableMoney: playingPosition.availableMoney - amount,
-  hands: [{ ...playingPosition.hands[0], bettingBox: amount }]
+  hands: [{ ...playingPosition.hands[STARTING_HAND_INDEX], bettingBox: amount }]
 });
 
 const toBettingPosition =
@@ -126,55 +126,6 @@ export const bet =
     };
   };
 
-type DealingInProgress = { cards: Card[]; playingPositions: PlayingPosition[] };
-
-const startDealing = ({ cards }: BlackJack) => ({
-  cards,
-  playingPositions: []
-});
-
-const untilDealingIsDone = (
-  { playingPositions, cards: [card1, card2, ...cards] }: DealingInProgress,
-  playingPosition: PlayingPosition
-): { cards: Card[]; playingPositions: PlayingPosition[] } => ({
-  cards,
-  playingPositions: [
-    ...playingPositions,
-    {
-      ...playingPosition,
-      hands: [
-        {
-          ...playingPosition.hands[0],
-          cards: [card1, card2] as Card[]
-        }
-      ]
-    }
-  ]
-});
-
-export const deal = (game: BlackJack): BlackJack => {
-  const { cards: initialCards, playingPositions } = game.playingPositions.reduce(untilDealingIsDone, startDealing(game));
-  const [dealerHand, ...cards] = initialCards;
-
-  return {
-    ...game,
-    ...{
-      playingPositions,
-      dealerHand:
-        dealerHand == null
-          ? {
-              isDone: false,
-              cards: []
-            }
-          : {
-              isDone: false,
-              cards: [dealerHand]
-            },
-      cards
-    }
-  };
-};
-
 const emptyDealerHand = (): DealerHand => ({ cards: [], isDone: false });
 
 const resetPlayingPosition = (): PlayingHand => ({ playingPositionId: 0, handIndex: 0 });
@@ -189,8 +140,7 @@ export const BlackJack =
     currentPlayingHand: resetPlayingPosition()
   });
 
-export const isGameFinished = (game: BlackJack): boolean =>
-  game.dealerHand.isDone && game.playingPositions.every(({ hands }) => hands.every(({ isDone }) => isDone));
+export const isGameFinished = (game: BlackJack): boolean => game.dealerHand.isDone && game.playingPositions.every(handsAreDone);
 
 const isWinner =
   ({ dealerHand: { cards: dealerCards } }: BlackJack) =>
@@ -223,13 +173,37 @@ const toPlayerGain =
   (gain: number, hand: Hand): number =>
     gainMatching.reduce(toMatchingGain(game)(hand), gain);
 
-export const gameEnd = (game: BlackJack): BlackJack => ({
-  ...game,
-  dealerHand: emptyDealerHand(),
-  playingPositions: game.playingPositions.map((playingPosition: PlayingPosition) => ({
+const onlyPlayersWithMoney = ({ availableMoney }: PlayingPosition): boolean => availableMoney > 0;
+
+const toResetPlayingPositions =
+  (game: BlackJack) =>
+  (playingPosition: PlayingPosition): PlayingPosition => ({
     ...playingPosition,
     availableMoney: playingPosition.availableMoney + playingPosition.hands.reduce(toPlayerGain(game), 0),
-    hands: [emptyPlayerHand()]
-  })),
-  currentPlayingHand: resetPlayingPosition()
-});
+    hands: [EMPTY_PLAYER_HAND]
+  });
+
+export const gameEnd = (game: BlackJack): BlackJack => {
+  if (!isGameFinished(game)) throw new Error('Game is not finished yet');
+
+  return {
+    ...game,
+    dealerHand: emptyDealerHand(),
+    playingPositions: game.playingPositions.map(toResetPlayingPositions(game)).filter(onlyPlayersWithMoney),
+    currentPlayingHand: resetPlayingPosition()
+  };
+};
+
+const isPlaying = (game: BlackJack) => (playingPositionId: PlayingPositionId) =>
+  game.playingPositions.at(playingPositionId)?.hands.some(({ bettingBox }) => bettingBox > 0);
+
+export const leave =
+  (game: BlackJack) =>
+  (playingPositionId: PlayingPositionId): BlackJack => {
+    if (isPlaying(game)(playingPositionId)) throw new Error('Cannot leave a started game');
+
+    return {
+      ...game,
+      playingPositions: game.playingPositions.filter(({ id }) => id !== playingPositionId)
+    };
+  };
