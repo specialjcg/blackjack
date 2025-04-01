@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeHandValue } from './decision-commons';
+import { computeHandValue } from './hand';
 
 describe('decision commons', () => {
   it('should not exceed 21 with q, q, ace', () => {

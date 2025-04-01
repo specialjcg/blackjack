@@ -1,5 +1,4 @@
-import { BlackJack, Card, DealerHand, PlayingPosition } from './black-jack';
-import { STARTING_HAND_INDEX } from './hand';
+import { BlackJack, Card, DealerHand, PlayingPosition, STARTING_HAND_INDEX } from '../core';
 
 type DealingInProgress = { cards: Card[]; playingPositions: PlayingPosition[] };
 
@@ -15,8 +14,11 @@ const giveCardsTo =
     hands: [{ ...playingPosition.hands[STARTING_HAND_INDEX], cards }]
   });
 
-const dealerHand = (card?: Card): { dealerHand: DealerHand } => ({
-  dealerHand: card == null ? { isDone: false, cards: [] } : { isDone: false, cards: [card] }
+const dealerHand = (card?: Card, dealerHiddenCard?: Card): { dealerHand: DealerHand } => ({
+  dealerHand:
+    card == null || dealerHiddenCard == null
+      ? { isDone: false, cards: [], hiddenCard: [] }
+      : { isDone: false, cards: [card], hiddenCard: [dealerHiddenCard] }
 });
 
 const untilDealingIsDone = (
@@ -29,9 +31,15 @@ const untilDealingIsDone = (
 
 const readyGame =
   (game: BlackJack) =>
-  ({ cards: [dealerCard, ...cards], playingPositions }: { playingPositions: PlayingPosition[]; cards: Card[] }) => ({
+  ({
+    cards: [dealerCard, dealerHiddenCard, ...cards],
+    playingPositions
+  }: {
+    playingPositions: PlayingPosition[];
+    cards: Card[];
+  }) => ({
     ...game,
-    ...{ playingPositions, ...dealerHand(dealerCard), cards }
+    ...{ playingPositions, ...dealerHand(dealerCard, dealerHiddenCard), cards }
   });
 
 export const deal = (game: BlackJack): BlackJack =>

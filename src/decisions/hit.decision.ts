@@ -1,15 +1,6 @@
-import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import {
-  addNextCard,
-  exceeding21,
-  initNextTurn,
-  isPlaying,
-  losePlayingPosition,
-  NextTurn,
-  noChangeFor,
-  prepareNextTurn
-} from './decision-commons';
-import { Hand, Hands } from '../player-hands';
+import { BlackJack, Card, exceeding21, Hand, Hands, isPlaying, PlayingPosition } from '../core';
+import { losePlayingPosition } from './lose-playing-position';
+import { addNextCard, initNextTurn, NextTurn, noChangeFor, prepareNextTurn } from './turn';
 
 const toUpdateHitHandsCards =
   (handIndex: number, cards: Card[]) =>
@@ -53,7 +44,7 @@ const toNextTurn =
       ? nextTurnFor(game)({ playingPosition, nextTurn })
       : noChangeFor(playingPosition)(nextTurn);
 
-export const hitDecision = (game: BlackJack) => (): BlackJack => {
+export const hit = (game: BlackJack) => (): BlackJack => {
   const nextTurn: NextTurn = game.playingPositions.reduce(toNextTurn(game), initNextTurn(game));
 
   return prepareNextTurn(game)({ ...game, playingPositions: nextTurn.playingPositions }, nextTurn.cards, true);

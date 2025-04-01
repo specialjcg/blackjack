@@ -1,15 +1,6 @@
-import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import { Hands } from '../player-hands';
-import {
-  addNextCard,
-  exceeding21,
-  initNextTurn,
-  isPlaying,
-  losePlayingPosition,
-  NextTurn,
-  noChangeFor,
-  prepareNextTurn
-} from './decision-commons';
+import { BlackJack, Card, exceeding21, Hands, isPlaying, PlayingPosition } from '../core';
+import { losePlayingPosition } from './lose-playing-position';
+import { addNextCard, initNextTurn, NextTurn, noChangeFor, prepareNextTurn } from './turn';
 
 export class OnlyDoubleWhenNoSplitError extends Error {
   public constructor() {
@@ -71,7 +62,7 @@ const toNextTurn =
       ? nextTurnFor(game)({ playingPosition, nextTurn })
       : noChangeFor(playingPosition)(nextTurn);
 
-export const doubleDecision = (game: BlackJack) => (): BlackJack => {
+export const double = (game: BlackJack) => (): BlackJack => {
   if (game.playingPositions.some((playingPosition: PlayingPosition) => playingPosition.hands.length > 1))
     throw new OnlyDoubleWhenNoSplitError();
 

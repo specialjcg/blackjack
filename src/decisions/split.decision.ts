@@ -1,6 +1,5 @@
-import { BlackJack, Card, PlayingPosition } from '../black-jack';
-import { Hands } from '../player-hands';
-import { initNextTurn, isPlaying, NextTurn, noChangeFor, prepareNextTurn } from './decision-commons';
+import { BlackJack, Card, Hands, isPlaying, PlayingPosition } from '../core';
+import { initNextTurn, NextTurn, noChangeFor, prepareNextTurn } from './turn';
 
 export class OnlySplitEqualCardsError extends Error {
   public constructor(card1: Card, card2: Card) {
@@ -45,13 +44,8 @@ const splitPlayingPosition =
   (split: InitSplit): PlayingPosition => {
     const [hand1Card, hand2Card] = playingPosition.hands[HAND_TO_SPLIT_INDEX].cards as [Card, Card];
 
-    if (playingPosition.hands[HAND_TO_SPLIT_INDEX].cards.length > 2) {
-      throw new OnlySplitFirstTurnError();
-    }
-
-    if (hand1Card != hand2Card) {
-      throw new OnlySplitEqualCardsError(hand1Card, hand2Card);
-    }
+    if (playingPosition.hands[HAND_TO_SPLIT_INDEX].cards.length > 2) throw new OnlySplitFirstTurnError();
+    if (hand1Card != hand2Card) throw new OnlySplitEqualCardsError(hand1Card, hand2Card);
 
     return {
       ...playingPosition,
@@ -85,7 +79,7 @@ const toNextTurn =
   (nextTurn: NextTurn, playingPosition: PlayingPosition): NextTurn =>
     isPlaying(game)(playingPosition) ? nextTurnFor(bet)({ playingPosition, nextTurn }) : noChangeFor(playingPosition)(nextTurn);
 
-export const splitDecision =
+export const split =
   (game: BlackJack) =>
   (bet: number): BlackJack => {
     const nextTurn: NextTurn = game.playingPositions.reduce(toNextTurn(game, bet), initNextTurn(game));
