@@ -52,11 +52,11 @@ const betterAceValueFor = (handValue: number): number =>
 
 const valueOf = (card: string) => (PICTURES.includes(card) ? PICTURE_VALUE : +card);
 
-export const computeHandValue = (hand: Card[]) => {
-  const numberOfAces = hand.filter((card) => card === 'ace').length;
+export const computeHandValue = (cards: Card[]) => {
+  const numberOfAces = cards.filter((card) => card === 'ace').length;
   return numberOfAces > 1
-    ? handValueWithMultipleAces(hand, numberOfAces)
-    : [...hand].sort(byAceAtTheEnd).reduce(toHandValue, STARTING_HAND_INDEX);
+    ? handValueWithMultipleAces(cards, numberOfAces)
+    : [...cards].sort(byAceAtTheEnd).reduce(toHandValue, STARTING_HAND_INDEX);
 };
 
 export const exceeding21 = (hand: Card[]) => computeHandValue(hand) > BEST_SCORE;
