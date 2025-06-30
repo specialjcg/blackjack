@@ -12,8 +12,7 @@ import {
 } from '../decisions';
 import { BlackJack } from './black-jack';
 import { Card } from './card';
-
-let seed = 1;
+import { randomShuffler } from './random-shuffler';
 
 const LOW_SHUFFLER: Shuffler = () => [
   ...(['2', '3', '4', '5', '6', '6', '5', '5', '4', '1', '7', '1', '7'] as Card[]),
@@ -35,19 +34,6 @@ const SPLIT_SHUFFLER: Shuffler = () => [
   ...(['4', 'j', '9', '2', 'q', '3', '6', 'j', '6', '5', '10', '6', 'ace'] as Card[]),
   ...(['q', '2', 'q', '8', '2', '9', 'ace', '8', '9', 'k', '3', '8', '2'] as Card[])
 ];
-
-const random = () => {
-  const x = Math.sin(seed++) * 10000;
-  return x - Math.floor(x);
-};
-
-const randomShuffler: Shuffler = (cards: Card[]) => {
-  for (let i = cards.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [cards[i], cards[j]] = [cards[j], cards[i]] as [Card, Card];
-  }
-  return cards;
-};
 
 const readyGameWithTwoPlayers = (shuffler?: Shuffler) => {
   const game = start(shuffler ? shuffler : randomShuffler)({
@@ -723,15 +709,3 @@ describe('blackJack game', () => {
     }).toThrowError('Game is not finished yet');
   });
 });
-
-// Comment jouer au blackjack
-// 1. Les joueurs placent leurs mises
-// 2. Le croupier distribue les cartes : une carte visible et une carte face cachée pour lui, une carte face visible pour chaque joueur
-// 3. Les joueurs décident de leur action : rester, tirer, doubler, partager, abandonner
-// 4. Le croupier révèle sa carte cachée et joue sa main jusqu'à ce qu'il atteigne 17 ou plus
-// 5. Les gains sont distribués
-// 6. Les joueurs peuvent quitter la table
-// 7. Retour à l'étape 1
-
-// todo: fix dealer turn
-//  simulate and check cases => dealer should reveal hidden card when all players are done, then play until 17

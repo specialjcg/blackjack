@@ -4,3 +4,4 @@ export * from './hand';
 export * from './model';
 export * from './player';
 export * from './playing-position';
+export * from './random-shuffler';

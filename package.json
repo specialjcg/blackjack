@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
+    "build": "tsc",
+    "dev": "tsx ./src/apps/cli/app.tsx",
     "test": "vitest",
     "lint.es": "eslint",
     "lint.commit": "commitlint --from origin/main",
@@ -15,18 +18,27 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@babel/cli": "^7.27.2",
+    "@babel/preset-react": "^7.27.1",
     "@commitlint/cli": "^19.3.0",
     "@commitlint/config-conventional": "^19.2.2",
     "@eslint/js": "^9.2.0",
     "@types/node": "^20.12.10",
+    "@types/react": "^18.3.23",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-vitest": "^0.5.4",
     "husky": "^9.0.11",
     "lint-staged": "^15.2.2",
     "prettier": "^3.2.5",
+    "tsx": "^4.19.4",
     "typescript": "^5.4.5",
     "typescript-eslint": "7.8.0",
-    "vitest": "^1.6.0"
+    "vitest": "^3.2.1"
+  },
+  "dependencies": {
+    "ink": "^5.2.1",
+    "piqure": "^2.1.1",
+    "react": "^18.3.1"
   }
 }
